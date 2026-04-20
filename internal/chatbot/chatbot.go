@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dmvianna/cheap-rag/internal/config"
 	"github.com/dmvianna/cheap-rag/internal/llm"
@@ -11,10 +12,11 @@ import (
 )
 
 type Service struct {
-	cfg       config.Config
-	retriever Retriever
-	gen       llm.GenerationProvider
-	validator Validator
+	cfg        config.Config
+	retriever  Retriever
+	gen        llm.GenerationProvider
+	validator  Validator
+	refusalSeq uint64
 }
 
 type Retriever interface {
@@ -74,7 +76,7 @@ func policyPrompt() string {
 }
 
 func refusalPolicyPrompt() string {
-	return "You write refusal messages only. Never answer the user's question. Follow the provided refusal intent."
+	return "You write short, friendly refusal messages only. Never answer the user's question. Do not mention retrieval, relevance, thresholds, confidence, scores, indexing, chunks, local content, policies, or implementation details. Do not include numbers."
 }
 
 func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
@@ -87,13 +89,54 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 		SystemPolicy: refusalPolicyPrompt(),
 	})
 	if err != nil {
-		return refuse(fallback, retrieved), nil
+		return refuse(s.fallbackRefusal(fallback), retrieved), nil
 	}
 	msg := strings.TrimSpace(genResp.Answer)
-	if msg == "" {
-		msg = fallback
+	if !isGenericRefusal(msg) {
+		msg = s.fallbackRefusal(fallback)
 	}
 	return refuse(msg, retrieved), nil
+}
+
+func (s *Service) fallbackRefusal(configured string) string {
+	configured = strings.TrimSpace(configured)
+	if configured != "" && isGenericRefusal(configured) {
+		return configured
+	}
+	variants := []string{
+		"Sorry, but I could not relate your question to the content I have.",
+		"Sorry, I could not connect that question to the material available to me.",
+		"Sorry, I can’t find enough relevant material to answer that question.",
+		"Sorry, that question does not seem to match the content I can use right now.",
+	}
+	next := atomic.AddUint64(&s.refusalSeq, 1)
+	return variants[(next-1)%uint64(len(variants))]
+}
+
+func isGenericRefusal(msg string) bool {
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return false
+	}
+	lower := strings.ToLower(msg)
+	banned := []string{
+		"threshold",
+		"similarity",
+		"score",
+		"confidence",
+		"retriev",
+		"evidence",
+		"local content",
+		"chunk",
+		"index",
+		"policy",
+	}
+	for _, term := range banned {
+		if strings.Contains(lower, term) {
+			return false
+		}
+	}
+	return true
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {

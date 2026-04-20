@@ -3,6 +3,7 @@ package chatbot
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dmvianna/cheap-rag/internal/config"
@@ -94,8 +95,8 @@ func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
 	if !out.Refused {
 		t.Fatalf("expected refusal")
 	}
-	if out.RefusalReason != "fallback refusal" {
-		t.Fatalf("expected fallback refusal, got %q", out.RefusalReason)
+	if strings.TrimSpace(out.RefusalReason) == "" {
+		t.Fatalf("expected non-empty fallback refusal")
 	}
 }
 
@@ -212,6 +213,42 @@ func TestUsesConfiguredRefusalMessages(t *testing.T) {
 	}
 	if lowOut.RefusalReason == cfg.Responses.Refusal.LowSimilarity {
 		t.Fatalf("expected placeholder-expanded low-similarity refusal")
+	}
+}
+
+func TestFallbackRefusalRotatesVariants(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	cfg.Responses.Refusal.NoRetrieval = "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold})."
+	gen := &fakeGenerator{err: errors.New("provider down")}
+	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
+
+	out1, err := svc.Ask(context.Background(), "question one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out2, err := svc.Ask(context.Background(), "question two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out1.RefusalReason == out2.RefusalReason {
+		t.Fatalf("expected refusal variants to rotate, got identical message %q", out1.RefusalReason)
+	}
+}
+
+func TestProviderRefusalIsFilteredIfTechnical(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	gen := &fakeGenerator{resp: llm.GenerationResponse{
+		Answer: "I can’t answer because similarity score is below threshold.",
+	}}
+	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
+	out, err := svc.Ask(context.Background(), "question")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.ToLower(out.RefusalReason), "threshold") || strings.Contains(strings.ToLower(out.RefusalReason), "similarity") {
+		t.Fatalf("expected non-technical refusal, got %q", out.RefusalReason)
 	}
 }
 
