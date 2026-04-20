@@ -55,8 +55,8 @@ func TestRefusesWhenNoRetrievedChunks(t *testing.T) {
 	if !out.Refused {
 		t.Fatalf("expected refusal")
 	}
-	if gen.calls != 0 {
-		t.Fatalf("expected generation not called")
+	if gen.calls != 1 {
+		t.Fatalf("expected generation called once to phrase refusal")
 	}
 }
 
@@ -76,8 +76,26 @@ func TestRefusesBelowRetrievalThreshold(t *testing.T) {
 	if !out.Refused {
 		t.Fatalf("expected refusal below threshold")
 	}
-	if gen.calls != 0 {
-		t.Fatalf("expected generation not called")
+	if gen.calls != 1 {
+		t.Fatalf("expected generation called once to phrase refusal")
+	}
+}
+
+func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	cfg.Responses.Refusal.NoRetrieval = "fallback refusal"
+	gen := &fakeGenerator{err: errors.New("provider down")}
+	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
+	out, err := svc.Ask(context.Background(), "what is ci?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !out.Refused {
+		t.Fatalf("expected refusal")
+	}
+	if out.RefusalReason != "fallback refusal" {
+		t.Fatalf("expected fallback refusal, got %q", out.RefusalReason)
 	}
 }
 
@@ -169,15 +187,18 @@ func TestUsesFallbackCitationsWhenModelProvidesNone(t *testing.T) {
 func TestUsesConfiguredRefusalMessages(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
-	cfg.Responses.Refusal.NoRetrieval = "custom no retrieval"
+	cfg.Responses.Refusal.NoRetrieval = "fallback no retrieval"
 	cfg.Responses.Refusal.LowSimilarity = "custom low similarity score={score} threshold={threshold}"
-	gen := &fakeGenerator{}
+	gen := &fakeGenerator{resp: llm.GenerationResponse{
+		Answer:    "provider-worded refusal",
+		Citations: nil,
+	}}
 	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
 	out, err := svc.Ask(context.Background(), "question")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.RefusalReason != "custom no retrieval" {
+	if out.RefusalReason != "provider-worded refusal" {
 		t.Fatalf("unexpected no retrieval refusal: %q", out.RefusalReason)
 	}
 

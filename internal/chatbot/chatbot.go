@@ -35,10 +35,12 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return refuse(s.cfg.Responses.Refusal.NoRetrieval, retrieved), nil
+		return s.refuseWithProvider(ctx, question, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "No relevant indexed chunks were found.")
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
-		return refuse(formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity), retrieved), nil
+		fallback := formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
+		intent := fmt.Sprintf("Retrieved content was related but below threshold (score %.3f, threshold %.3f).", retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
+		return s.refuseWithProvider(ctx, question, retrieved, fallback, intent)
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -69,6 +71,29 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 
 func policyPrompt() string {
 	return "You are a guarded assistant for local blog content only. Use only provided evidence chunks. If evidence is insufficient, return JSON with answer explaining refusal and empty citations. Do not invent entities or facts."
+}
+
+func refusalPolicyPrompt() string {
+	return "You write refusal messages only. Never answer the user's question. Explain briefly that the chatbot could not answer from indexed local content. Output JSON only."
+}
+
+func (s *Service) refuseWithProvider(ctx context.Context, question string, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
+	prompt := strings.TrimSpace(fmt.Sprintf("User question:\n%s\n\nRefusal intent:\n%s\n\nWrite one short refusal sentence with this intent.", question, intent))
+	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
+		Question:     prompt,
+		Evidence:     nil,
+		Model:        s.cfg.Model,
+		Temperature:  s.cfg.GenerationTemperature,
+		SystemPolicy: refusalPolicyPrompt(),
+	})
+	if err != nil {
+		return refuse(fallback, retrieved), nil
+	}
+	msg := strings.TrimSpace(genResp.Answer)
+	if msg == "" {
+		msg = fallback
+	}
+	return refuse(msg, retrieved), nil
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {
