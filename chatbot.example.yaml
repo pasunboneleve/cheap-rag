@@ -2,7 +2,7 @@ content_root: ./content
 runtime_root: ./.chatbot
 provider: gemini
 model: gemini-2.0-flash
-embedding_model: text-embedding-004
+embedding_model: gemini-embedding-001
 retrieval:
   top_k: 5
   min_query_similarity: 0.45

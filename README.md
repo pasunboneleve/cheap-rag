@@ -8,7 +8,7 @@ This project is a separate chatbot prototype to test retrieval guardrails before
 - `internal/config`: YAML config with explicit thresholds and model/provider settings
 - `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
 - `internal/chunking`: deterministic chunking and indexing orchestration
-- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`) for embeddings + generation
+- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`) for embeddings + generation
 - `internal/store`: SQLite-backed local vector store (inspectable, local, boring)
 - `internal/retrieval`: embed query and fetch top-k by cosine similarity
 - `internal/policy`: practical v1 answer validation against retrieved evidence
@@ -68,6 +68,7 @@ Required fields:
 API keys:
 - Gemini: `GEMINI_API_KEY`
 - OpenAI-compatible: `OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`)
+- xAI: `XAI_API_KEY` (and optional `XAI_BASE_URL`, default `https://api.x.ai/v1`)
 
 ## Run
 
@@ -86,7 +87,19 @@ go run ./cmd/chatbot shell \
   --runtime ./.chatbot \
   --provider gemini \
   --model gemini-2.0-flash \
-  --embedding-model text-embedding-004
+  --embedding-model gemini-embedding-001
+```
+
+xAI example:
+
+```bash
+export XAI_API_KEY=...
+go run ./cmd/chatbot shell \
+  --content ./content \
+  --runtime ./.chatbot \
+  --provider xai \
+  --model grok-4-0709 \
+  --embedding-model text-embedding-3-large
 ```
 
 ## Guardrail behaviour examples
