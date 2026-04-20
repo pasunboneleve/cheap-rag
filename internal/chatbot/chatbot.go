@@ -99,11 +99,11 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 		SystemPolicy: refusalPolicyPrompt(),
 	})
 	if err != nil {
-		return refuse(seedFallback(fallbackSeed, s.fallbackRefusal()), retrieved), nil
+		return refuse(seedFallback(fallbackSeed, s.fallbackRefusal), retrieved), nil
 	}
 	msg := strings.TrimSpace(genResp.Answer)
 	if msg == "" {
-		msg = seedFallback(fallbackSeed, s.fallbackRefusal())
+		msg = seedFallback(fallbackSeed, s.fallbackRefusal)
 	}
 	return refuse(msg, retrieved), nil
 }
@@ -113,12 +113,12 @@ func (s *Service) fallbackRefusal() string {
 	return genericRefusalVariants[(next-1)%uint64(len(genericRefusalVariants))]
 }
 
-func seedFallback(seed, rotated string) string {
+func seedFallback(seed string, fallback func() string) string {
 	seed = strings.TrimSpace(seed)
 	if seed != "" {
 		return seed
 	}
-	return rotated
+	return fallback()
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {
