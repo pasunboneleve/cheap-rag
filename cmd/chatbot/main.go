@@ -168,7 +168,7 @@ func runServe(ctx context.Context, args []string) error {
 	httpSrv := &http.Server{
 		Handler:      httpserver.New(service, cfg.InternalToken, logger).Handler(),
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 

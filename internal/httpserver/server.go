@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -115,7 +116,7 @@ func (s *Server) authorized(r *http.Request) bool {
 		return false
 	}
 	got := strings.TrimSpace(strings.TrimPrefix(h, prefix))
-	return got == s.token
+	return subtle.ConstantTimeCompare([]byte(got), []byte(s.token)) == 1
 }
 
 func (s *Server) requestLogMiddleware(next http.Handler) http.Handler {
@@ -166,10 +167,11 @@ func ListenUnixSocket(socketPath string) (net.Listener, func() error, error) {
 		once.Do(func() {
 			if err := ln.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 				cleanupErr = err
-				return
 			}
 			if err := os.Remove(socketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-				cleanupErr = err
+				if cleanupErr == nil {
+					cleanupErr = err
+				}
 			}
 		})
 		return cleanupErr
