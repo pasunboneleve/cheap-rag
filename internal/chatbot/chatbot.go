@@ -44,10 +44,10 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return s.refuseWithProvider(ctx, retrieved)
+		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval)
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
-		return s.refuseWithProvider(ctx, retrieved)
+		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.LowSimilarity)
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -84,8 +84,12 @@ func refusalPolicyPrompt() string {
 	return "Rewrite the provided sentence in one short sentence. Keep the same meaning."
 }
 
-func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult) (types.AskOutcome, error) {
-	prompt := `Rephrase this sentence in one short sentence: "Sorry, I don't know how to answer this."`
+func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, seed string) (types.AskOutcome, error) {
+	seed = strings.TrimSpace(seed)
+	if seed == "" {
+		seed = "Sorry, I don't know how to answer this."
+	}
+	prompt := fmt.Sprintf("Rephrase this sentence in one short sentence: %q", seed)
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     prompt,
 		Evidence:     nil,

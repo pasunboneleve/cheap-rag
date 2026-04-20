@@ -56,8 +56,8 @@ func Default() Config {
 		CitationPattern:       "{chunk_id}",
 		Responses: ResponsesConfig{
 			Refusal: RefusalResponses{
-				NoRetrieval:   "I can only answer from indexed local content. I found no relevant chunks.",
-				LowSimilarity: "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold}).",
+				NoRetrieval:   "Sorry, I don't know how to answer this.",
+				LowSimilarity: "Sorry, I don't know how to answer this.",
 			},
 		},
 		Retrieval: RetrievalConfig{
