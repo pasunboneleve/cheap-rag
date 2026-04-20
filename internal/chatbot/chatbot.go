@@ -85,11 +85,12 @@ func refusalPolicyPrompt() string {
 }
 
 func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, seed string) (types.AskOutcome, error) {
-	seed = strings.TrimSpace(seed)
-	if seed == "" {
-		seed = "Sorry, I don't know how to answer this."
+	fallbackSeed := strings.TrimSpace(seed)
+	promptSeed := fallbackSeed
+	if promptSeed == "" {
+		promptSeed = "Sorry, I don't know how to answer this."
 	}
-	prompt := fmt.Sprintf("Rephrase this sentence in one short sentence: %q", seed)
+	prompt := fmt.Sprintf("Rephrase this sentence in one short sentence: %q", promptSeed)
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     prompt,
 		Evidence:     nil,
@@ -98,11 +99,11 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 		SystemPolicy: refusalPolicyPrompt(),
 	})
 	if err != nil {
-		return refuse(s.fallbackRefusal(), retrieved), nil
+		return refuse(seedFallback(fallbackSeed, s.fallbackRefusal()), retrieved), nil
 	}
 	msg := strings.TrimSpace(genResp.Answer)
 	if msg == "" {
-		msg = s.fallbackRefusal()
+		msg = seedFallback(fallbackSeed, s.fallbackRefusal())
 	}
 	return refuse(msg, retrieved), nil
 }
@@ -110,6 +111,14 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 func (s *Service) fallbackRefusal() string {
 	next := s.refusalSeq.Add(1)
 	return genericRefusalVariants[(next-1)%uint64(len(genericRefusalVariants))]
+}
+
+func seedFallback(seed, rotated string) string {
+	seed = strings.TrimSpace(seed)
+	if seed != "" {
+		return seed
+	}
+	return rotated
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {

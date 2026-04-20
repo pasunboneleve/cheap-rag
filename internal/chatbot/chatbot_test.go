@@ -88,6 +88,7 @@ func TestRefusesBelowRetrievalThreshold(t *testing.T) {
 func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
+	cfg.Responses.Refusal.NoRetrieval = "Sorry, I don't know how to answer this."
 	gen := &fakeGenerator{err: errors.New("provider down")}
 	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
 	out, err := svc.Ask(context.Background(), "what is ci?")
@@ -97,8 +98,8 @@ func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
 	if !out.Refused {
 		t.Fatalf("expected refusal")
 	}
-	if strings.TrimSpace(out.RefusalReason) == "" {
-		t.Fatalf("expected non-empty fallback refusal")
+	if out.RefusalReason != cfg.Responses.Refusal.NoRetrieval {
+		t.Fatalf("expected configured seed fallback, got %q", out.RefusalReason)
 	}
 }
 

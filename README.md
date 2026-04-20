@@ -65,8 +65,8 @@ Required fields:
   - Note: when `generation_provider: anthropic`, temperature must be `<= 1.0`.
 - `embedding_model`
 - `citation_pattern` (optional, default `{chunk_id}`)
-- `responses.refusal.no_retrieval` (optional)
-- `responses.refusal.low_similarity` (optional; supports `{score}` and `{threshold}`)
+- `responses.refusal.no_retrieval` (optional seed sentence for refusal rephrasing)
+- `responses.refusal.low_similarity` (optional seed sentence for refusal rephrasing)
 - `retrieval.top_k`
 - `retrieval.min_query_similarity`
 - `validation.min_evidence_coverage`
@@ -146,7 +146,7 @@ citation_pattern: "{slug}"
 Sample refusal message:
 
 ```text
-I can only answer when local evidence is relevant enough (top similarity 0.213 < threshold 0.450).
+Sorry, but I could not relate your question to the content I have.
 ```
 
 Sample grounded answer shape:

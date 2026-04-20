@@ -8,8 +8,8 @@ embedding_model: gemini-embedding-001
 citation_pattern: "{chunk_id}"
 responses:
   refusal:
-    no_retrieval: "I can only answer from indexed local content. I found no relevant chunks."
-    low_similarity: "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold})."
+    no_retrieval: "Sorry, I don't know how to answer this."
+    low_similarity: "Sorry, I don't know how to answer this."
 retrieval:
   top_k: 5
   min_query_similarity: 0.45

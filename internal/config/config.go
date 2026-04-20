@@ -56,8 +56,8 @@ func Default() Config {
 		CitationPattern:       "{chunk_id}",
 		Responses: ResponsesConfig{
 			Refusal: RefusalResponses{
-				NoRetrieval:   "Sorry, I don't know how to answer this.",
-				LowSimilarity: "Sorry, I don't know how to answer this.",
+				NoRetrieval:   "",
+				LowSimilarity: "",
 			},
 		},
 		Retrieval: RetrievalConfig{
