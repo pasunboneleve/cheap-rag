@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,6 +211,7 @@ func parseConfigFlags(cmd string, args []string) (config.Config, []string, error
 	generationProvider := fs.String("generation-provider", "", "generation provider name")
 	embeddingProvider := fs.String("embedding-provider", "", "embeddings provider name")
 	model := fs.String("model", "", "generation model")
+	generationTemperature := fs.Float64("generation-temperature", math.NaN(), "generation temperature")
 	embedModel := fs.String("embedding-model", "", "embedding model")
 	citationPattern := fs.String("citation-pattern", "", "citation pattern template")
 	if err := fs.Parse(args); err != nil {
@@ -219,7 +221,7 @@ func parseConfigFlags(cmd string, args []string) (config.Config, []string, error
 	if err != nil {
 		return config.Config{}, nil, err
 	}
-	cfg.ApplyOverrides(*contentRoot, *runtimeRoot, *provider, *generationProvider, *embeddingProvider, *model, *embedModel, *citationPattern)
+	cfg.ApplyOverrides(*contentRoot, *runtimeRoot, *provider, *generationProvider, *embeddingProvider, *model, *embedModel, *citationPattern, generationTemperature)
 	if err := cfg.Validate(); err != nil {
 		return config.Config{}, nil, err
 	}
@@ -237,5 +239,5 @@ func absOrOriginal(p string) string {
 }
 
 func usageError() error {
-	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot --citation-pattern \"{chunk_id}\"\n  chatbot shell --content ./content --runtime ./.chatbot --generation-provider xai --embedding-provider gemini --model grok-4-1-fast-reasoning --embedding-model gemini-embedding-001 --citation-pattern \"{slug}\"\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
+	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot --citation-pattern \"{chunk_id}\"\n  chatbot shell --content ./content --runtime ./.chatbot --generation-provider xai --embedding-provider gemini --model grok-4-1-fast-reasoning --generation-temperature 0.7 --embedding-model gemini-embedding-001 --citation-pattern \"{slug}\"\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
 }

@@ -61,8 +61,11 @@ Required fields:
 - `generation_provider`
 - `embedding_provider`
 - `model`
+- `generation_temperature` (optional, 0-2, default `0.4`)
 - `embedding_model`
 - `citation_pattern` (optional, default `{chunk_id}`)
+- `responses.refusal.no_retrieval` (optional)
+- `responses.refusal.low_similarity` (optional; supports `{score}` and `{threshold}`)
 - `retrieval.top_k`
 - `retrieval.min_query_similarity`
 - `validation.min_evidence_coverage`
@@ -100,6 +103,7 @@ go run ./cmd/chatbot shell \
   --generation-provider gemini \
   --embedding-provider gemini \
   --model gemini-2.0-flash \
+  --generation-temperature 0.5 \
   --embedding-model gemini-embedding-001
 ```
 

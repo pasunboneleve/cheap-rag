@@ -3,8 +3,13 @@ runtime_root: ./.chatbot
 generation_provider: gemini
 embedding_provider: gemini
 model: gemini-2.0-flash
+generation_temperature: 0.5
 embedding_model: gemini-embedding-001
 citation_pattern: "{chunk_id}"
+responses:
+  refusal:
+    no_retrieval: "I can only answer from indexed local content. I found no relevant chunks."
+    low_similarity: "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold})."
 retrieval:
   top_k: 5
   min_query_similarity: 0.45

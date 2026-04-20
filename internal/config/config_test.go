@@ -19,7 +19,8 @@ func TestValidateUsesLegacyProviderFallback(t *testing.T) {
 func TestApplyOverridesSplitProviders(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.ApplyOverrides("", "", "", "xai", "gemini", "grok-4-1-fast-reasoning", "gemini-embedding-001", "{slug}")
+	temp := 0.9
+	cfg.ApplyOverrides("", "", "", "xai", "gemini", "grok-4-1-fast-reasoning", "gemini-embedding-001", "{slug}", &temp)
 	if cfg.GenerationProvider != "xai" {
 		t.Fatalf("unexpected generation provider: %s", cfg.GenerationProvider)
 	}
@@ -29,7 +30,19 @@ func TestApplyOverridesSplitProviders(t *testing.T) {
 	if cfg.CitationPattern != "{slug}" {
 		t.Fatalf("unexpected citation pattern: %s", cfg.CitationPattern)
 	}
+	if cfg.GenerationTemperature != 0.9 {
+		t.Fatalf("unexpected generation temperature: %v", cfg.GenerationTemperature)
+	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected valid config: %v", err)
+	}
+}
+
+func TestValidateRejectsOutOfRangeGenerationTemperature(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.GenerationTemperature = 3.0
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected out-of-range generation temperature validation error")
 	}
 }

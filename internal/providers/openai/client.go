@@ -71,7 +71,7 @@ func (c *Client) Generate(ctx context.Context, req llm.GenerationRequest) (llm.G
 			{"role": "system", "content": req.SystemPolicy},
 			{"role": "user", "content": prompt},
 		},
-		"temperature": 0.0,
+		"temperature": req.Temperature,
 	}
 	var resp struct {
 		Choices []struct {

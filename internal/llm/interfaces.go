@@ -13,6 +13,7 @@ type GenerationRequest struct {
 	Question     string
 	Evidence     []EvidenceChunk
 	Model        string
+	Temperature  float64
 	SystemPolicy string
 }
 

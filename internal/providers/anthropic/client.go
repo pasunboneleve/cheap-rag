@@ -50,7 +50,7 @@ func (c *Client) Generate(ctx context.Context, req llm.GenerationRequest) (llm.G
 	body := map[string]any{
 		"model":       req.Model,
 		"max_tokens":  700,
-		"temperature": 0.0,
+		"temperature": req.Temperature,
 		"system":      req.SystemPolicy,
 		"messages": []map[string]any{{
 			"role":    "user",

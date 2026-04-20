@@ -35,10 +35,10 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return refuse("I can only answer from indexed local content. I found no relevant chunks.", retrieved), nil
+		return refuse(s.cfg.Responses.Refusal.NoRetrieval, retrieved), nil
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
-		return refuse(fmt.Sprintf("I can only answer when local evidence is relevant enough (top similarity %.3f < threshold %.3f).", retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity), retrieved), nil
+		return refuse(formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity), retrieved), nil
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -48,6 +48,7 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		Question:     question,
 		Evidence:     evidence,
 		Model:        s.cfg.Model,
+		Temperature:  s.cfg.GenerationTemperature,
 		SystemPolicy: policyPrompt(),
 	})
 	if err != nil {
@@ -72,6 +73,13 @@ func policyPrompt() string {
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {
 	return types.AskOutcome{Refused: true, RefusalReason: reason, Retrieved: retrieved}
+}
+
+func formatLowSimilarity(template string, score, threshold float64) string {
+	return strings.NewReplacer(
+		"{score}", fmt.Sprintf("%.3f", score),
+		"{threshold}", fmt.Sprintf("%.3f", threshold),
+	).Replace(template)
 }
 
 func sanitizeCitations(citations []string) []string {

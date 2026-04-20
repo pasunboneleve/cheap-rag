@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -11,16 +12,18 @@ import (
 
 // Config holds runtime settings for the chatbot.
 type Config struct {
-	ContentRoot        string           `yaml:"content_root"`
-	RuntimeRoot        string           `yaml:"runtime_root"`
-	Provider           string           `yaml:"provider"` // legacy fallback for both providers
-	GenerationProvider string           `yaml:"generation_provider"`
-	EmbeddingProvider  string           `yaml:"embedding_provider"`
-	Model              string           `yaml:"model"`
-	EmbeddingModel     string           `yaml:"embedding_model"`
-	CitationPattern    string           `yaml:"citation_pattern"`
-	Retrieval          RetrievalConfig  `yaml:"retrieval"`
-	Validation         ValidationConfig `yaml:"validation"`
+	ContentRoot           string           `yaml:"content_root"`
+	RuntimeRoot           string           `yaml:"runtime_root"`
+	Provider              string           `yaml:"provider"` // legacy fallback for both providers
+	GenerationProvider    string           `yaml:"generation_provider"`
+	EmbeddingProvider     string           `yaml:"embedding_provider"`
+	Model                 string           `yaml:"model"`
+	GenerationTemperature float64          `yaml:"generation_temperature"`
+	EmbeddingModel        string           `yaml:"embedding_model"`
+	CitationPattern       string           `yaml:"citation_pattern"`
+	Responses             ResponsesConfig  `yaml:"responses"`
+	Retrieval             RetrievalConfig  `yaml:"retrieval"`
+	Validation            ValidationConfig `yaml:"validation"`
 }
 
 type RetrievalConfig struct {
@@ -32,15 +35,31 @@ type ValidationConfig struct {
 	MinEvidenceCoverage float64 `yaml:"min_evidence_coverage"`
 }
 
+type ResponsesConfig struct {
+	Refusal RefusalResponses `yaml:"refusal"`
+}
+
+type RefusalResponses struct {
+	NoRetrieval   string `yaml:"no_retrieval"`
+	LowSimilarity string `yaml:"low_similarity"`
+}
+
 func Default() Config {
 	return Config{
-		ContentRoot:        "./content",
-		RuntimeRoot:        "./.chatbot",
-		GenerationProvider: "openai-compatible",
-		EmbeddingProvider:  "openai-compatible",
-		Model:              "gpt-4o-mini",
-		EmbeddingModel:     "text-embedding-3-small",
-		CitationPattern:    "{chunk_id}",
+		ContentRoot:           "./content",
+		RuntimeRoot:           "./.chatbot",
+		GenerationProvider:    "openai-compatible",
+		EmbeddingProvider:     "openai-compatible",
+		Model:                 "gpt-4o-mini",
+		GenerationTemperature: 0.4,
+		EmbeddingModel:        "text-embedding-3-small",
+		CitationPattern:       "{chunk_id}",
+		Responses: ResponsesConfig{
+			Refusal: RefusalResponses{
+				NoRetrieval:   "I can only answer from indexed local content. I found no relevant chunks.",
+				LowSimilarity: "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold}).",
+			},
+		},
 		Retrieval: RetrievalConfig{
 			TopK:               5,
 			MinQuerySimilarity: 0.45,
@@ -67,7 +86,7 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationProvider, embeddingProvider, model, embeddingModel, citationPattern string) {
+func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationProvider, embeddingProvider, model, embeddingModel, citationPattern string, generationTemperature *float64) {
 	if contentRoot != "" {
 		c.ContentRoot = contentRoot
 	}
@@ -95,6 +114,9 @@ func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationPr
 	if citationPattern != "" {
 		c.CitationPattern = citationPattern
 	}
+	if generationTemperature != nil && !math.IsNaN(*generationTemperature) {
+		c.GenerationTemperature = *generationTemperature
+	}
 }
 
 func (c *Config) Validate() error {
@@ -112,6 +134,16 @@ func (c *Config) Validate() error {
 	}
 	if c.CitationPattern == "" {
 		c.CitationPattern = "{chunk_id}"
+	}
+	if c.GenerationTemperature < 0 || c.GenerationTemperature > 2 {
+		return errors.New("generation_temperature must be between 0 and 2")
+	}
+	defaults := Default()
+	if c.Responses.Refusal.NoRetrieval == "" {
+		c.Responses.Refusal.NoRetrieval = defaults.Responses.Refusal.NoRetrieval
+	}
+	if c.Responses.Refusal.LowSimilarity == "" {
+		c.Responses.Refusal.LowSimilarity = defaults.Responses.Refusal.LowSimilarity
 	}
 	if c.Retrieval.TopK <= 0 {
 		return errors.New("retrieval.top_k must be > 0")
