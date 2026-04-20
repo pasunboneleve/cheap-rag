@@ -44,42 +44,26 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 	for _, r := range retrieved {
 		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Citation: r.Chunk.Citation, Path: r.Chunk.Path, Text: r.Chunk.Text})
 	}
-	const maxGenerationAttempts = 2
-	var bestOutcome types.AskOutcome
-	var bestSet bool
-	for attempt := 0; attempt < maxGenerationAttempts; attempt++ {
-		genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
-			Question:     question,
-			Evidence:     evidence,
-			Model:        s.cfg.Model,
-			SystemPolicy: policyPrompt(),
-		})
-		if err != nil {
-			return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
-		}
-		citations := sanitizeCitations(genResp.Citations)
-		if len(citations) == 0 {
-			citations = fallbackCitations(retrieved, 3)
-		}
-		report := s.validator.Validate(genResp.Answer, citations, retrieved)
-		out := types.AskOutcome{
-			Answer:     genResp.Answer,
-			Citations:  citations,
-			Retrieved:  retrieved,
-			Validation: report,
-		}
-		if report.Valid {
-			return out, nil
-		}
-		if !bestSet || out.Validation.Coverage > bestOutcome.Validation.Coverage {
-			bestOutcome = out
-			bestSet = true
-		}
+	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
+		Question:     question,
+		Evidence:     evidence,
+		Model:        s.cfg.Model,
+		SystemPolicy: policyPrompt(),
+	})
+	if err != nil {
+		return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
 	}
-	if bestSet {
-		return bestOutcome, nil
+	citations := sanitizeCitations(genResp.Citations)
+	if len(citations) == 0 {
+		citations = fallbackCitations(retrieved, 3)
 	}
-	return refuse("I could not produce an answer from retrieved evidence.", retrieved), nil
+	report := s.validator.Validate(genResp.Answer, citations, retrieved)
+	return types.AskOutcome{
+		Answer:     genResp.Answer,
+		Citations:  citations,
+		Retrieved:  retrieved,
+		Validation: report,
+	}, nil
 }
 
 func policyPrompt() string {
