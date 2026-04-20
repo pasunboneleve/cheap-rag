@@ -8,7 +8,8 @@ import (
 )
 
 var splitSentences = regexp.MustCompile(`[.!?]\s+`)
-var namedEntity = regexp.MustCompile(`\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b`)
+var multiWordTitleEntity = regexp.MustCompile(`\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b`)
+var acronymEntity = regexp.MustCompile(`\b[A-Z]{2,}\b`)
 
 type Validator struct {
 	minCoverage float64
@@ -89,10 +90,7 @@ func tokenise(s string) []string {
 }
 
 func entityMismatches(answer, evidence string) []string {
-	matches := namedEntity.FindAllString(answer, -1)
-	if len(matches) == 0 {
-		return nil
-	}
+	matches := append(multiWordTitleEntity.FindAllString(answer, -1), acronymEntity.FindAllString(answer, -1)...)
 	seen := map[string]struct{}{}
 	var unsupported []string
 	for _, m := range matches {
