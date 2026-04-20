@@ -1,0 +1,131 @@
+# Standalone guarded blog chatbot prototype (Go)
+
+This project is a separate chatbot prototype to test retrieval guardrails before integrating anything into the blog runtime.
+
+## Architecture overview
+
+- `cmd/chatbot`: thin CLI edge for `index`, `ask`, `shell`, `inspect query`
+- `internal/config`: YAML config with explicit thresholds and model/provider settings
+- `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
+- `internal/chunking`: deterministic chunking and indexing orchestration
+- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`) for embeddings + generation
+- `internal/store`: SQLite-backed local vector store (inspectable, local, boring)
+- `internal/retrieval`: embed query and fetch top-k by cosine similarity
+- `internal/policy`: practical v1 answer validation against retrieved evidence
+- `internal/chatbot`: orchestration service that applies retrieval gate + generation + validation
+- `internal/repl`: interactive shell
+
+## Why retrieval is the gatekeeper
+
+The model is only allowed to answer if retrieval passes a deterministic threshold (`retrieval.min_query_similarity`).
+
+- If top similarity is below threshold: refuse out-of-scope.
+- If retrieval has no results: refuse out-of-scope.
+- Generation happens only after retrieval passes.
+
+This keeps stochastic generation behind a deterministic scope gate.
+
+## Why validation is limited in v1
+
+Validation in v1 is intentionally simple and inspectable:
+
+- checks claim-token overlap against cited evidence text
+- checks unsupported named entities against evidence text
+- requires citations to map to retrieved chunk IDs
+- applies `validation.min_evidence_coverage`
+
+This is not a formal truth verifier. It reduces obvious unsupported claims while keeping complexity low.
+
+## Vector store choice and tradeoffs
+
+This prototype uses SQLite (`modernc.org/sqlite`) with vectors stored as JSON and cosine scoring in Go.
+
+Pros:
+- inspectable local file (`runtime_root/index.sqlite`)
+- minimal moving parts
+- simple migration path to ANN later
+
+Cons:
+- full scan query path is slower at larger scales
+- no approximate nearest neighbour index yet
+
+For prototype-scale content, this is a practical baseline.
+
+## Configuration
+
+Example: [`chatbot.example.yaml`](chatbot.example.yaml)
+
+Required fields:
+- `content_root`
+- `runtime_root`
+- `provider`
+- `model`
+- `embedding_model`
+- `retrieval.top_k`
+- `retrieval.min_query_similarity`
+- `validation.min_evidence_coverage`
+
+API keys:
+- Gemini: `GEMINI_API_KEY`
+- OpenAI-compatible: `OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`)
+
+## Run
+
+```bash
+go run ./cmd/chatbot index --config ./chatbot.example.yaml
+go run ./cmd/chatbot shell --config ./chatbot.example.yaml
+go run ./cmd/chatbot ask --config ./chatbot.example.yaml "what is cheap to change?"
+go run ./cmd/chatbot inspect query --config ./chatbot.example.yaml "ci cd"
+```
+
+You can also override config fields with flags:
+
+```bash
+go run ./cmd/chatbot shell \
+  --content ./content \
+  --runtime ./.chatbot \
+  --provider gemini \
+  --model gemini-2.0-flash \
+  --embedding-model text-embedding-004
+```
+
+## Guardrail behaviour examples
+
+Sample refusal message:
+
+```text
+I can only answer when local evidence is relevant enough (top similarity 0.213 < threshold 0.450).
+```
+
+Sample grounded answer shape:
+
+```json
+{
+  "answer": "Cheap change is mainly about reducing coupling and using explicit interfaces so changes stay local.",
+  "citations": ["chunk_123abc"]
+}
+```
+
+## Path and filesystem safety
+
+- content is read only from `content_root`
+- runtime files are written only under `runtime_root`
+- runtime root cannot be nested under content root
+- path traversal attempts are rejected
+- symlink escapes outside roots are rejected
+
+## Current scope and stubs
+
+Implemented:
+- CLI scaffold with index/ask/shell/inspect
+- provider abstractions and two concrete providers
+- retrieval threshold refusal
+- deterministic post-generation validation
+- SQLite local vector store
+- tests for path boundaries, out-of-scope refusal, retrieval threshold refusal, validation refusal
+
+Still minimal in v1:
+- no ANN index
+- no incremental indexing (current index replace is full rebuild)
+- simplistic claim/entity heuristics for validation
+- no structured logging pipeline yet
