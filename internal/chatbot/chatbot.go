@@ -3,6 +3,7 @@ package chatbot
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dmvianna/cheap-rag/internal/config"
 	"github.com/dmvianna/cheap-rag/internal/llm"
@@ -44,7 +45,8 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Citation: r.Chunk.Citation, Path: r.Chunk.Path, Text: r.Chunk.Text})
 	}
 	const maxGenerationAttempts = 2
-	var lastOutcome types.AskOutcome
+	var bestOutcome types.AskOutcome
+	var bestSet bool
 	for attempt := 0; attempt < maxGenerationAttempts; attempt++ {
 		genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 			Question:     question,
@@ -55,27 +57,29 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		if err != nil {
 			return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
 		}
-		if len(genResp.Citations) == 0 {
-			lastOutcome = refuse("I could not produce a grounded answer with citations from retrieved evidence.", retrieved)
-			continue
+		citations := sanitizeCitations(genResp.Citations)
+		if len(citations) == 0 {
+			citations = fallbackCitations(retrieved, 3)
 		}
-		report := s.validator.Validate(genResp.Answer, genResp.Citations, retrieved)
+		report := s.validator.Validate(genResp.Answer, citations, retrieved)
+		out := types.AskOutcome{
+			Answer:     genResp.Answer,
+			Citations:  citations,
+			Retrieved:  retrieved,
+			Validation: report,
+		}
 		if report.Valid {
-			return types.AskOutcome{
-				Answer:     genResp.Answer,
-				Citations:  genResp.Citations,
-				Retrieved:  retrieved,
-				Validation: report,
-			}, nil
+			return out, nil
 		}
-		lastOutcome = types.AskOutcome{
-			Refused:       true,
-			RefusalReason: "I found related content but the evidence was insufficient to support a reliable answer.",
-			Retrieved:     retrieved,
-			Validation:    report,
+		if !bestSet || out.Validation.Coverage > bestOutcome.Validation.Coverage {
+			bestOutcome = out
+			bestSet = true
 		}
 	}
-	return lastOutcome, nil
+	if bestSet {
+		return bestOutcome, nil
+	}
+	return refuse("I could not produce an answer from retrieved evidence.", retrieved), nil
 }
 
 func policyPrompt() string {
@@ -84,4 +88,47 @@ func policyPrompt() string {
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {
 	return types.AskOutcome{Refused: true, RefusalReason: reason, Retrieved: retrieved}
+}
+
+func sanitizeCitations(citations []string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, c := range citations {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		if _, ok := seen[c]; ok {
+			continue
+		}
+		seen[c] = struct{}{}
+		out = append(out, c)
+	}
+	return out
+}
+
+func fallbackCitations(retrieved []types.RetrievalResult, limit int) []string {
+	if limit <= 0 {
+		limit = 1
+	}
+	seen := map[string]struct{}{}
+	var out []string
+	for _, r := range retrieved {
+		cite := strings.TrimSpace(r.Chunk.Citation)
+		if cite == "" {
+			cite = r.Chunk.ID
+		}
+		if cite == "" {
+			continue
+		}
+		if _, ok := seen[cite]; ok {
+			continue
+		}
+		seen[cite] = struct{}{}
+		out = append(out, cite)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
 }

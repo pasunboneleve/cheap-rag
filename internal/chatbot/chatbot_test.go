@@ -79,7 +79,7 @@ func TestRefusesBelowRetrievalThreshold(t *testing.T) {
 	}
 }
 
-func TestRefusesWhenValidationFails(t *testing.T) {
+func TestReturnsAnswerWhenValidationFails(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
 	cfg.Validation.MinEvidenceCoverage = 0.8
@@ -96,8 +96,8 @@ func TestRefusesWhenValidationFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !out.Refused {
-		t.Fatalf("expected refusal when validation fails")
+	if out.Refused {
+		t.Fatalf("expected answer even when validation fails")
 	}
 	if out.Validation.Valid {
 		t.Fatalf("expected invalid validation report")
@@ -119,19 +119,14 @@ func TestBubblesGenerationErrors(t *testing.T) {
 	}
 }
 
-func TestRetriesWhenFirstResponseMissingCitationsThenSucceeds(t *testing.T) {
+func TestDoesNotNeedRetryWhenFallbackCitationsAreAvailable(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
 	evidence := []types.RetrievalResult{{
 		Chunk:      types.Chunk{ID: "chunk_1", Citation: "chunk_1", Path: "post.md", Text: "low coupling and explicit boundaries"},
 		Similarity: 0.95,
 	}}
-	gen := &fakeGenerator{
-		seq: []llm.GenerationResponse{
-			{Answer: "Low coupling matters.", Citations: nil},
-			{Answer: "Low coupling and explicit boundaries make change cheaper.", Citations: []string{"chunk_1"}},
-		},
-	}
+	gen := &fakeGenerator{resp: llm.GenerationResponse{Answer: "Low coupling matters.", Citations: nil}}
 	svc := New(cfg, fakeRetriever{results: evidence}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
 	out, err := svc.Ask(context.Background(), "question")
 	if err != nil {
@@ -140,7 +135,31 @@ func TestRetriesWhenFirstResponseMissingCitationsThenSucceeds(t *testing.T) {
 	if out.Refused {
 		t.Fatalf("expected answer after retry, got refusal: %+v", out)
 	}
-	if gen.calls != 2 {
-		t.Fatalf("expected two generation attempts, got %d", gen.calls)
+	if gen.calls != 1 {
+		t.Fatalf("expected one generation attempt, got %d", gen.calls)
+	}
+}
+
+func TestUsesFallbackCitationsWhenModelProvidesNone(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	evidence := []types.RetrievalResult{
+		{Chunk: types.Chunk{ID: "chunk_1", Citation: "cite-1", Path: "post.md", Text: "evidence one"}, Similarity: 0.91},
+		{Chunk: types.Chunk{ID: "chunk_2", Citation: "cite-2", Path: "post.md", Text: "evidence two"}, Similarity: 0.90},
+	}
+	gen := &fakeGenerator{resp: llm.GenerationResponse{
+		Answer:    "Use explicit boundaries and fast feedback loops.",
+		Citations: nil,
+	}}
+	svc := New(cfg, fakeRetriever{results: evidence}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
+	out, err := svc.Ask(context.Background(), "question")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Refused {
+		t.Fatalf("expected answer with fallback citations")
+	}
+	if len(out.Citations) == 0 {
+		t.Fatalf("expected fallback citations to be populated")
 	}
 }
