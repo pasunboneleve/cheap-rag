@@ -1,6 +1,10 @@
 # cheap-rag
 
-This project is a separate chatbot prototype to test retrieval guardrails before integrating anything into the blog runtime.
+**cheap-rag** is a deliberately simple, low-cost RAG implementation. It
+answers only when local content is sufficiently similar to the
+question. Otherwise, it refuses.
+
+Not designed for scale. When scale becomes a bottleneck, replace it.
 
 ## Architecture overview
 
@@ -38,7 +42,7 @@ This is not a formal truth verifier. It reduces obvious unsupported claims while
 
 ## Vector store choice and tradeoffs
 
-This prototype uses SQLite (`modernc.org/sqlite`) with vectors stored as JSON and cosine scoring in Go.
+cheap-rag uses SQLite (`modernc.org/sqlite`) with vectors stored as JSON and cosine scoring in Go.
 
 Pros:
 - inspectable local file (`runtime_root/index.sqlite`)
@@ -49,7 +53,7 @@ Cons:
 - full scan query path is slower at larger scales
 - no approximate nearest neighbour index yet
 
-For prototype-scale content, this is a practical baseline.
+This is the intended baseline for cheap, inspectable deployments, not high-scale workloads.
 
 ## Configuration
 

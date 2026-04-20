@@ -19,7 +19,7 @@ func NewEmbeddings(name string) (llm.EmbeddingsProvider, error) {
 	case "xai":
 		return xai.NewClient(), nil
 	case "anthropic":
-		return nil, fmt.Errorf("unsupported embeddings provider: %s (Anthropic is generation-only in this prototype)", name)
+		return nil, fmt.Errorf("unsupported embeddings provider: %s (Anthropic is generation-only in cheap-rag)", name)
 	default:
 		return nil, fmt.Errorf("unsupported embeddings provider: %s", name)
 	}
