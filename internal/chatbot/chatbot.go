@@ -35,12 +35,12 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return s.refuseWithProvider(ctx, question, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "No relevant indexed chunks were found.")
+		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "No relevant indexed chunks were found.")
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
 		fallback := formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
 		intent := fmt.Sprintf("Retrieved content was related but below threshold (score %.3f, threshold %.3f).", retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
-		return s.refuseWithProvider(ctx, question, retrieved, fallback, intent)
+		return s.refuseWithProvider(ctx, retrieved, fallback, intent)
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -77,8 +77,8 @@ func refusalPolicyPrompt() string {
 	return "You write refusal messages only. Never answer the user's question. Follow the provided refusal intent."
 }
 
-func (s *Service) refuseWithProvider(ctx context.Context, question string, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
-	prompt := strings.TrimSpace(fmt.Sprintf("User question:\n%s\n\nRefusal intent:\n%s\n\nWrite one short refusal sentence with this intent.", question, intent))
+func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
+	prompt := strings.TrimSpace(fmt.Sprintf("Refusal intent:\n%s\n\nWrite one short refusal sentence with this intent.", intent))
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     prompt,
 		Evidence:     nil,
