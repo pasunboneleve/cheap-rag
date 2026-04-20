@@ -1,4 +1,4 @@
-module github.com/dmvianna/chatbot-prototype
+module github.com/dmvianna/cheap-rag
 
 go 1.25.8
 

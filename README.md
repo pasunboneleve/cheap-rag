@@ -1,4 +1,4 @@
-# Standalone guarded blog chatbot prototype (Go)
+# cheap-rag
 
 This project is a separate chatbot prototype to test retrieval guardrails before integrating anything into the blog runtime.
 

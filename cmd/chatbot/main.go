@@ -9,17 +9,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dmvianna/chatbot-prototype/internal/chatbot"
-	"github.com/dmvianna/chatbot-prototype/internal/chunking"
-	"github.com/dmvianna/chatbot-prototype/internal/config"
-	"github.com/dmvianna/chatbot-prototype/internal/fsguard"
-	"github.com/dmvianna/chatbot-prototype/internal/llm"
-	"github.com/dmvianna/chatbot-prototype/internal/policy"
-	"github.com/dmvianna/chatbot-prototype/internal/providers"
-	"github.com/dmvianna/chatbot-prototype/internal/repl"
-	"github.com/dmvianna/chatbot-prototype/internal/retrieval"
-	"github.com/dmvianna/chatbot-prototype/internal/store"
-	"github.com/dmvianna/chatbot-prototype/internal/types"
+	"github.com/dmvianna/cheap-rag/internal/chatbot"
+	"github.com/dmvianna/cheap-rag/internal/chunking"
+	"github.com/dmvianna/cheap-rag/internal/config"
+	"github.com/dmvianna/cheap-rag/internal/fsguard"
+	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/policy"
+	"github.com/dmvianna/cheap-rag/internal/providers"
+	"github.com/dmvianna/cheap-rag/internal/repl"
+	"github.com/dmvianna/cheap-rag/internal/retrieval"
+	"github.com/dmvianna/cheap-rag/internal/store"
+	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
 func main() {

@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dmvianna/chatbot-prototype/internal/config"
-	"github.com/dmvianna/chatbot-prototype/internal/llm"
-	"github.com/dmvianna/chatbot-prototype/internal/policy"
-	"github.com/dmvianna/chatbot-prototype/internal/types"
+	"github.com/dmvianna/cheap-rag/internal/config"
+	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/policy"
+	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
 type fakeRetriever struct {

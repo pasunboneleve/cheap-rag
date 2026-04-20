@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dmvianna/chatbot-prototype/internal/types"
+	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
 // SplitText chunks text with overlap for retrieval.

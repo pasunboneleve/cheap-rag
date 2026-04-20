@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dmvianna/chatbot-prototype/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/llm"
 )
 
 type Client struct {

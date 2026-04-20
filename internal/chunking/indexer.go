@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dmvianna/chatbot-prototype/internal/fsguard"
-	"github.com/dmvianna/chatbot-prototype/internal/llm"
-	"github.com/dmvianna/chatbot-prototype/internal/store"
+	"github.com/dmvianna/cheap-rag/internal/fsguard"
+	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/store"
 )
 
 type Indexer struct {

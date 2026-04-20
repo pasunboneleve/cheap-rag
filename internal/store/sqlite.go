@@ -11,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/dmvianna/chatbot-prototype/internal/types"
+	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
 type SQLiteStore struct {
