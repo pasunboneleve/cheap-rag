@@ -43,33 +43,39 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 	for _, r := range retrieved {
 		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Citation: r.Chunk.Citation, Path: r.Chunk.Path, Text: r.Chunk.Text})
 	}
-	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
-		Question:     question,
-		Evidence:     evidence,
-		Model:        s.cfg.Model,
-		SystemPolicy: policyPrompt(),
-	})
-	if err != nil {
-		return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
-	}
-	if len(genResp.Citations) == 0 {
-		return refuse("I could not produce a grounded answer with citations from retrieved evidence.", retrieved), nil
-	}
-	report := s.validator.Validate(genResp.Answer, genResp.Citations, retrieved)
-	if !report.Valid {
-		return types.AskOutcome{
+	const maxGenerationAttempts = 2
+	var lastOutcome types.AskOutcome
+	for attempt := 0; attempt < maxGenerationAttempts; attempt++ {
+		genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
+			Question:     question,
+			Evidence:     evidence,
+			Model:        s.cfg.Model,
+			SystemPolicy: policyPrompt(),
+		})
+		if err != nil {
+			return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
+		}
+		if len(genResp.Citations) == 0 {
+			lastOutcome = refuse("I could not produce a grounded answer with citations from retrieved evidence.", retrieved)
+			continue
+		}
+		report := s.validator.Validate(genResp.Answer, genResp.Citations, retrieved)
+		if report.Valid {
+			return types.AskOutcome{
+				Answer:     genResp.Answer,
+				Citations:  genResp.Citations,
+				Retrieved:  retrieved,
+				Validation: report,
+			}, nil
+		}
+		lastOutcome = types.AskOutcome{
 			Refused:       true,
 			RefusalReason: "I found related content but the evidence was insufficient to support a reliable answer.",
 			Retrieved:     retrieved,
 			Validation:    report,
-		}, nil
+		}
 	}
-	return types.AskOutcome{
-		Answer:     genResp.Answer,
-		Citations:  genResp.Citations,
-		Retrieved:  retrieved,
-		Validation: report,
-	}, nil
+	return lastOutcome, nil
 }
 
 func policyPrompt() string {

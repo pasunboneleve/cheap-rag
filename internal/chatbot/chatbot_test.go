@@ -22,6 +22,7 @@ func (f fakeRetriever) Retrieve(context.Context, string, int) ([]types.Retrieval
 
 type fakeGenerator struct {
 	resp  llm.GenerationResponse
+	seq   []llm.GenerationResponse
 	err   error
 	calls int
 }
@@ -31,6 +32,11 @@ func (f *fakeGenerator) Generate(context.Context, llm.GenerationRequest) (llm.Ge
 	f.calls++
 	if f.err != nil {
 		return llm.GenerationResponse{}, f.err
+	}
+	if len(f.seq) > 0 {
+		resp := f.seq[0]
+		f.seq = f.seq[1:]
+		return resp, nil
 	}
 	return f.resp, nil
 }
@@ -110,5 +116,31 @@ func TestBubblesGenerationErrors(t *testing.T) {
 	_, err := svc.Ask(context.Background(), "question")
 	if err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+func TestRetriesWhenFirstResponseMissingCitationsThenSucceeds(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	evidence := []types.RetrievalResult{{
+		Chunk:      types.Chunk{ID: "chunk_1", Citation: "chunk_1", Path: "post.md", Text: "low coupling and explicit boundaries"},
+		Similarity: 0.95,
+	}}
+	gen := &fakeGenerator{
+		seq: []llm.GenerationResponse{
+			{Answer: "Low coupling matters.", Citations: nil},
+			{Answer: "Low coupling and explicit boundaries make change cheaper.", Citations: []string{"chunk_1"}},
+		},
+	}
+	svc := New(cfg, fakeRetriever{results: evidence}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
+	out, err := svc.Ask(context.Background(), "question")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Refused {
+		t.Fatalf("expected answer after retry, got refusal: %+v", out)
+	}
+	if gen.calls != 2 {
+		t.Fatalf("expected two generation attempts, got %d", gen.calls)
 	}
 }

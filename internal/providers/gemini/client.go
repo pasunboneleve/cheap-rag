@@ -77,7 +77,7 @@ func (c *Client) Generate(ctx context.Context, req llm.GenerationRequest) (llm.G
 			"parts": []map[string]string{{"text": prompt}},
 		}},
 		"generationConfig": map[string]any{
-			"temperature": 0.1,
+			"temperature": 0.0,
 		},
 		"systemInstruction": map[string]any{
 			"parts": []map[string]string{{"text": req.SystemPolicy}},
