@@ -1,6 +1,7 @@
 content_root: ./content
 runtime_root: ./.chatbot
-provider: gemini
+generation_provider: gemini
+embedding_provider: gemini
 model: gemini-2.0-flash
 embedding_model: gemini-embedding-001
 retrieval:

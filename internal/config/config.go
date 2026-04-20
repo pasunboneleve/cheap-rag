@@ -11,13 +11,15 @@ import (
 
 // Config holds runtime settings for the chatbot.
 type Config struct {
-	ContentRoot    string           `yaml:"content_root"`
-	RuntimeRoot    string           `yaml:"runtime_root"`
-	Provider       string           `yaml:"provider"`
-	Model          string           `yaml:"model"`
-	EmbeddingModel string           `yaml:"embedding_model"`
-	Retrieval      RetrievalConfig  `yaml:"retrieval"`
-	Validation     ValidationConfig `yaml:"validation"`
+	ContentRoot        string           `yaml:"content_root"`
+	RuntimeRoot        string           `yaml:"runtime_root"`
+	Provider           string           `yaml:"provider"` // legacy fallback for both providers
+	GenerationProvider string           `yaml:"generation_provider"`
+	EmbeddingProvider  string           `yaml:"embedding_provider"`
+	Model              string           `yaml:"model"`
+	EmbeddingModel     string           `yaml:"embedding_model"`
+	Retrieval          RetrievalConfig  `yaml:"retrieval"`
+	Validation         ValidationConfig `yaml:"validation"`
 }
 
 type RetrievalConfig struct {
@@ -31,11 +33,12 @@ type ValidationConfig struct {
 
 func Default() Config {
 	return Config{
-		ContentRoot:    "./content",
-		RuntimeRoot:    "./.chatbot",
-		Provider:       "openai-compatible",
-		Model:          "gpt-4o-mini",
-		EmbeddingModel: "text-embedding-3-small",
+		ContentRoot:        "./content",
+		RuntimeRoot:        "./.chatbot",
+		GenerationProvider: "openai-compatible",
+		EmbeddingProvider:  "openai-compatible",
+		Model:              "gpt-4o-mini",
+		EmbeddingModel:     "text-embedding-3-small",
 		Retrieval: RetrievalConfig{
 			TopK:               5,
 			MinQuerySimilarity: 0.45,
@@ -62,15 +65,24 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, model, embeddingModel string) {
+func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationProvider, embeddingProvider, model, embeddingModel string) {
 	if contentRoot != "" {
 		c.ContentRoot = contentRoot
 	}
 	if runtimeRoot != "" {
 		c.RuntimeRoot = runtimeRoot
 	}
+	// Legacy single-provider override still supported.
 	if provider != "" {
 		c.Provider = provider
+		c.GenerationProvider = provider
+		c.EmbeddingProvider = provider
+	}
+	if generationProvider != "" {
+		c.GenerationProvider = generationProvider
+	}
+	if embeddingProvider != "" {
+		c.EmbeddingProvider = embeddingProvider
 	}
 	if model != "" {
 		c.Model = model
@@ -80,12 +92,18 @@ func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, model, embed
 	}
 }
 
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.ContentRoot == "" || c.RuntimeRoot == "" {
 		return errors.New("content_root and runtime_root are required")
 	}
-	if c.Provider == "" || c.Model == "" || c.EmbeddingModel == "" {
-		return errors.New("provider, model and embedding_model are required")
+	if c.GenerationProvider == "" && c.Provider != "" {
+		c.GenerationProvider = c.Provider
+	}
+	if c.EmbeddingProvider == "" && c.Provider != "" {
+		c.EmbeddingProvider = c.Provider
+	}
+	if c.GenerationProvider == "" || c.EmbeddingProvider == "" || c.Model == "" || c.EmbeddingModel == "" {
+		return errors.New("generation_provider, embedding_provider, model and embedding_model are required (legacy provider also accepted)")
 	}
 	if c.Retrieval.TopK <= 0 {
 		return errors.New("retrieval.top_k must be > 0")

@@ -5,7 +5,7 @@ This project is a separate chatbot prototype to test retrieval guardrails before
 ## Architecture overview
 
 - `cmd/chatbot`: thin CLI edge for `index`, `ask`, `shell`, `inspect query`
-- `internal/config`: YAML config with explicit thresholds and model/provider settings
+- `internal/config`: YAML config with explicit thresholds and split generation/embedding provider settings
 - `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
 - `internal/chunking`: deterministic chunking and indexing orchestration
 - `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`) for embeddings + generation
@@ -58,12 +58,16 @@ Example: [`chatbot.example.yaml`](chatbot.example.yaml)
 Required fields:
 - `content_root`
 - `runtime_root`
-- `provider`
+- `generation_provider`
+- `embedding_provider`
 - `model`
 - `embedding_model`
 - `retrieval.top_k`
 - `retrieval.min_query_similarity`
 - `validation.min_evidence_coverage`
+
+Backward compatibility:
+- Legacy `provider` is still accepted and applied to both generation and embeddings.
 
 API keys:
 - Gemini: `GEMINI_API_KEY`
@@ -85,7 +89,8 @@ You can also override config fields with flags:
 go run ./cmd/chatbot shell \
   --content ./content \
   --runtime ./.chatbot \
-  --provider gemini \
+  --generation-provider gemini \
+  --embedding-provider gemini \
   --model gemini-2.0-flash \
   --embedding-model gemini-embedding-001
 ```
@@ -97,9 +102,10 @@ export XAI_API_KEY=...
 go run ./cmd/chatbot shell \
   --content ./content \
   --runtime ./.chatbot \
-  --provider xai \
+  --generation-provider xai \
+  --embedding-provider gemini \
   --model grok-4-0709 \
-  --embedding-model text-embedding-3-large
+  --embedding-model gemini-embedding-001
 ```
 
 ## Guardrail behaviour examples

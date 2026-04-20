@@ -179,12 +179,12 @@ func bootstrap(cfg config.Config) (*fsguard.Guard, *store.SQLiteStore, llm.Embed
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	embedProvider, err := providers.NewEmbeddings(cfg.Provider)
+	embedProvider, err := providers.NewEmbeddings(cfg.EmbeddingProvider)
 	if err != nil {
 		_ = st.Close()
 		return nil, nil, nil, nil, err
 	}
-	genProvider, err := providers.NewGenerator(cfg.Provider)
+	genProvider, err := providers.NewGenerator(cfg.GenerationProvider)
 	if err != nil {
 		_ = st.Close()
 		return nil, nil, nil, nil, err
@@ -198,7 +198,9 @@ func parseConfigFlags(cmd string, args []string) (config.Config, []string, error
 	configPath := fs.String("config", "", "config file path")
 	contentRoot := fs.String("content", "", "content root")
 	runtimeRoot := fs.String("runtime", "", "runtime root")
-	provider := fs.String("provider", "", "provider name")
+	provider := fs.String("provider", "", "legacy provider name for both generation and embeddings")
+	generationProvider := fs.String("generation-provider", "", "generation provider name")
+	embeddingProvider := fs.String("embedding-provider", "", "embeddings provider name")
 	model := fs.String("model", "", "generation model")
 	embedModel := fs.String("embedding-model", "", "embedding model")
 	if err := fs.Parse(args); err != nil {
@@ -208,7 +210,7 @@ func parseConfigFlags(cmd string, args []string) (config.Config, []string, error
 	if err != nil {
 		return config.Config{}, nil, err
 	}
-	cfg.ApplyOverrides(*contentRoot, *runtimeRoot, *provider, *model, *embedModel)
+	cfg.ApplyOverrides(*contentRoot, *runtimeRoot, *provider, *generationProvider, *embeddingProvider, *model, *embedModel)
 	if err := cfg.Validate(); err != nil {
 		return config.Config{}, nil, err
 	}
@@ -226,5 +228,5 @@ func absOrOriginal(p string) string {
 }
 
 func usageError() error {
-	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot\n  chatbot shell --content ./content --runtime ./.chatbot --provider gemini --model gemini-2.0-flash\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
+	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot\n  chatbot shell --content ./content --runtime ./.chatbot --generation-provider xai --embedding-provider gemini --model grok-4-1-fast-reasoning --embedding-model gemini-embedding-001\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
 }
