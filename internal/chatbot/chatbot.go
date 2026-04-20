@@ -74,7 +74,7 @@ func policyPrompt() string {
 }
 
 func refusalPolicyPrompt() string {
-	return "You write refusal messages only. Never answer the user's question. Explain briefly that the chatbot could not answer from indexed local content. Output JSON only."
+	return "You write refusal messages only. Never answer the user's question. Follow the provided refusal intent."
 }
 
 func (s *Service) refuseWithProvider(ctx context.Context, question string, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
