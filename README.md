@@ -62,6 +62,7 @@ Required fields:
 - `embedding_provider`
 - `model`
 - `generation_temperature` (optional, 0-2, default `0.4`)
+  - Note: when `generation_provider: anthropic`, temperature must be `<= 1.0`.
 - `embedding_model`
 - `citation_pattern` (optional, default `{chunk_id}`)
 - `responses.refusal.no_retrieval` (optional)

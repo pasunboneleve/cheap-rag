@@ -46,3 +46,13 @@ func TestValidateRejectsOutOfRangeGenerationTemperature(t *testing.T) {
 		t.Fatalf("expected out-of-range generation temperature validation error")
 	}
 }
+
+func TestValidateRejectsAnthropicTemperatureAboveOne(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.GenerationProvider = "anthropic"
+	cfg.GenerationTemperature = 1.2
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected anthropic temperature validation error")
+	}
+}

@@ -138,6 +138,9 @@ func (c *Config) Validate() error {
 	if c.GenerationTemperature < 0 || c.GenerationTemperature > 2 {
 		return errors.New("generation_temperature must be between 0 and 2")
 	}
+	if c.GenerationProvider == "anthropic" && c.GenerationTemperature > 1 {
+		return errors.New("generation_temperature must be <= 1 when generation_provider is anthropic")
+	}
 	defaults := Default()
 	if c.Responses.Refusal.NoRetrieval == "" {
 		c.Responses.Refusal.NoRetrieval = defaults.Responses.Refusal.NoRetrieval
