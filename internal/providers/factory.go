@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dmvianna/chatbot-prototype/internal/llm"
+	"github.com/dmvianna/chatbot-prototype/internal/providers/anthropic"
 	"github.com/dmvianna/chatbot-prototype/internal/providers/gemini"
 	"github.com/dmvianna/chatbot-prototype/internal/providers/openai"
 	"github.com/dmvianna/chatbot-prototype/internal/providers/xai"
@@ -17,6 +18,8 @@ func NewEmbeddings(name string) (llm.EmbeddingsProvider, error) {
 		return gemini.NewClient(), nil
 	case "xai":
 		return xai.NewClient(), nil
+	case "anthropic":
+		return nil, fmt.Errorf("unsupported embeddings provider: %s (Anthropic is generation-only in this prototype)", name)
 	default:
 		return nil, fmt.Errorf("unsupported embeddings provider: %s", name)
 	}
@@ -30,6 +33,8 @@ func NewGenerator(name string) (llm.GenerationProvider, error) {
 		return gemini.NewClient(), nil
 	case "xai":
 		return xai.NewClient(), nil
+	case "anthropic":
+		return anthropic.NewClient(), nil
 	default:
 		return nil, fmt.Errorf("unsupported generation provider: %s", name)
 	}

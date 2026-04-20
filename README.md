@@ -8,7 +8,7 @@ This project is a separate chatbot prototype to test retrieval guardrails before
 - `internal/config`: YAML config with explicit thresholds and split generation/embedding provider settings
 - `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
 - `internal/chunking`: deterministic chunking and indexing orchestration
-- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`) for embeddings + generation
+- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`, `anthropic`) for embeddings + generation
 - `internal/store`: SQLite-backed local vector store (inspectable, local, boring)
 - `internal/retrieval`: embed query and fetch top-k by cosine similarity
 - `internal/policy`: practical v1 answer validation against retrieved evidence
@@ -80,6 +80,7 @@ API keys:
 - Gemini: `GEMINI_API_KEY`
 - OpenAI-compatible: `OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`)
 - xAI: `XAI_API_KEY` (and optional `XAI_BASE_URL`, default `https://api.x.ai/v1`)
+- Anthropic (generation): `ANTHROPIC_API_KEY` (optional `ANTHROPIC_BASE_URL`, `ANTHROPIC_VERSION`)
 
 ## Run
 
@@ -113,6 +114,20 @@ go run ./cmd/chatbot shell \
   --embedding-provider gemini \
   --model grok-4-0709 \
   --embedding-model gemini-embedding-001
+```
+
+Anthropic generation + OpenAI embeddings example:
+
+```bash
+export ANTHROPIC_API_KEY=...
+export OPENAI_API_KEY=...
+go run ./cmd/chatbot shell \
+  --content ./content \
+  --runtime ./.chatbot \
+  --generation-provider anthropic \
+  --embedding-provider openai-compatible \
+  --model claude-sonnet-4-5 \
+  --embedding-model text-embedding-3-small
 ```
 
 Blog slug citation example:

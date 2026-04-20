@@ -20,3 +20,19 @@ func TestFactorySupportsXAI(t *testing.T) {
 		t.Fatalf("unexpected generator name: %s", gen.Name())
 	}
 }
+
+func TestFactorySupportsAnthropicGenerationOnly(t *testing.T) {
+	t.Parallel()
+	gen, err := NewGenerator("anthropic")
+	if err != nil {
+		t.Fatalf("expected anthropic generator provider: %v", err)
+	}
+	if gen.Name() != "anthropic" {
+		t.Fatalf("unexpected generator name: %s", gen.Name())
+	}
+
+	_, err = NewEmbeddings("anthropic")
+	if err == nil {
+		t.Fatalf("expected anthropic embeddings provider to be unsupported")
+	}
+}
