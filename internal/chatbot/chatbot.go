@@ -38,31 +38,17 @@ var genericRefusalVariants = []string{
 	"Sorry, that question does not seem to match the content I can use right now.",
 }
 
-var technicalRefusalTerms = []string{
-	"threshold",
-	"similarity",
-	"score",
-	"confidence",
-	"retriev",
-	"evidence",
-	"local content",
-	"chunk",
-	"index",
-	"policy",
-}
-
 func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, error) {
 	retrieved, err := s.retriever.Retrieve(ctx, question, s.cfg.Retrieval.TopK)
 	if err != nil {
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "No relevant indexed chunks were found.")
+		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "out_of_scope")
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
 		fallback := formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
-		intent := fmt.Sprintf("Retrieved content was related but below threshold (score %.3f, threshold %.3f).", retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
-		return s.refuseWithProvider(ctx, retrieved, fallback, intent)
+		return s.refuseWithProvider(ctx, retrieved, fallback, "not_related_to_available_content")
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -96,11 +82,12 @@ func policyPrompt() string {
 }
 
 func refusalPolicyPrompt() string {
-	return "You write short, friendly refusal messages only. Never answer the user's question. Do not mention retrieval, relevance, thresholds, confidence, scores, indexing, chunks, local content, policies, or implementation details. Do not include numbers."
+	return "Rewrite the provided sentence in one short sentence. Keep the same meaning."
 }
 
 func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
-	prompt := strings.TrimSpace(fmt.Sprintf("Refusal intent:\n%s\n\nWrite one short refusal sentence with this intent.", intent))
+	_ = intent
+	prompt := `Rephrase this sentence in one short sentence: "Sorry, I don't know how to answer this."`
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     prompt,
 		Evidence:     nil,
@@ -112,32 +99,15 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 		return refuse(s.fallbackRefusal(fallback), retrieved), nil
 	}
 	msg := strings.TrimSpace(genResp.Answer)
-	if !isGenericRefusal(msg) {
+	if msg == "" {
 		msg = s.fallbackRefusal(fallback)
 	}
 	return refuse(msg, retrieved), nil
 }
 
 func (s *Service) fallbackRefusal(configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured != "" && isGenericRefusal(configured) {
-		return configured
-	}
 	next := s.refusalSeq.Add(1)
 	return genericRefusalVariants[(next-1)%uint64(len(genericRefusalVariants))]
-}
-
-func isGenericRefusal(msg string) bool {
-	if msg == "" {
-		return false
-	}
-	lower := strings.ToLower(msg)
-	for _, term := range technicalRefusalTerms {
-		if strings.Contains(lower, term) {
-			return false
-		}
-	}
-	return true
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {

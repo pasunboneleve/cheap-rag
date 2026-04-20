@@ -80,6 +80,9 @@ func TestRefusesBelowRetrievalThreshold(t *testing.T) {
 	if gen.calls != 1 {
 		t.Fatalf("expected generation called once to phrase refusal")
 	}
+	if strings.Contains(strings.ToLower(gen.lastReq.Question), "threshold") || strings.Contains(strings.ToLower(gen.lastReq.Question), "score") {
+		t.Fatalf("expected non-technical refusal prompt, got %q", gen.lastReq.Question)
+	}
 }
 
 func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
@@ -236,19 +239,19 @@ func TestFallbackRefusalRotatesVariants(t *testing.T) {
 	}
 }
 
-func TestProviderRefusalIsFilteredIfTechnical(t *testing.T) {
+func TestRefusalPromptDoesNotContainUserQuestion(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
 	gen := &fakeGenerator{resp: llm.GenerationResponse{
-		Answer: "I can’t answer because similarity score is below threshold.",
+		Answer: "Sorry, I don't know how to answer this.",
 	}}
 	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
-	out, err := svc.Ask(context.Background(), "question")
+	_, err := svc.Ask(context.Background(), "how do I build a football team?")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(strings.ToLower(out.RefusalReason), "threshold") || strings.Contains(strings.ToLower(out.RefusalReason), "similarity") {
-		t.Fatalf("expected non-technical refusal, got %q", out.RefusalReason)
+	if strings.Contains(strings.ToLower(gen.lastReq.Question), "football") {
+		t.Fatalf("expected refusal prompt to exclude user question, got %q", gen.lastReq.Question)
 	}
 }
 
