@@ -7,3 +7,4 @@
 *.sqlite-wal
 .DS_Store
 .beads/embeddeddolt/
+chatbot.blog.yaml
