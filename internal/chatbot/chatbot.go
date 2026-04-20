@@ -44,11 +44,10 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		return types.AskOutcome{}, err
 	}
 	if len(retrieved) == 0 {
-		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval, "out_of_scope")
+		return s.refuseWithProvider(ctx, retrieved)
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
-		fallback := formatLowSimilarity(s.cfg.Responses.Refusal.LowSimilarity, retrieved[0].Similarity, s.cfg.Retrieval.MinQuerySimilarity)
-		return s.refuseWithProvider(ctx, retrieved, fallback, "not_related_to_available_content")
+		return s.refuseWithProvider(ctx, retrieved)
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
@@ -85,8 +84,7 @@ func refusalPolicyPrompt() string {
 	return "Rewrite the provided sentence in one short sentence. Keep the same meaning."
 }
 
-func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult, fallback string, intent string) (types.AskOutcome, error) {
-	_ = intent
+func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.RetrievalResult) (types.AskOutcome, error) {
 	prompt := `Rephrase this sentence in one short sentence: "Sorry, I don't know how to answer this."`
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     prompt,
@@ -96,29 +94,22 @@ func (s *Service) refuseWithProvider(ctx context.Context, retrieved []types.Retr
 		SystemPolicy: refusalPolicyPrompt(),
 	})
 	if err != nil {
-		return refuse(s.fallbackRefusal(fallback), retrieved), nil
+		return refuse(s.fallbackRefusal(), retrieved), nil
 	}
 	msg := strings.TrimSpace(genResp.Answer)
 	if msg == "" {
-		msg = s.fallbackRefusal(fallback)
+		msg = s.fallbackRefusal()
 	}
 	return refuse(msg, retrieved), nil
 }
 
-func (s *Service) fallbackRefusal(configured string) string {
+func (s *Service) fallbackRefusal() string {
 	next := s.refusalSeq.Add(1)
 	return genericRefusalVariants[(next-1)%uint64(len(genericRefusalVariants))]
 }
 
 func refuse(reason string, retrieved []types.RetrievalResult) types.AskOutcome {
 	return types.AskOutcome{Refused: true, RefusalReason: reason, Retrieved: retrieved}
-}
-
-func formatLowSimilarity(template string, score, threshold float64) string {
-	return strings.NewReplacer(
-		"{score}", fmt.Sprintf("%.3f", score),
-		"{threshold}", fmt.Sprintf("%.3f", threshold),
-	).Replace(template)
 }
 
 func sanitizeCitations(citations []string) []string {

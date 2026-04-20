@@ -88,7 +88,6 @@ func TestRefusesBelowRetrievalThreshold(t *testing.T) {
 func TestRefusalFallsBackWhenProviderFails(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
-	cfg.Responses.Refusal.NoRetrieval = "fallback refusal"
 	gen := &fakeGenerator{err: errors.New("provider down")}
 	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
 	out, err := svc.Ask(context.Background(), "what is ci?")
@@ -188,11 +187,9 @@ func TestUsesFallbackCitationsWhenModelProvidesNone(t *testing.T) {
 	}
 }
 
-func TestUsesConfiguredRefusalMessages(t *testing.T) {
+func TestUsesProviderRefusalMessage(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
-	cfg.Responses.Refusal.NoRetrieval = "fallback no retrieval"
-	cfg.Responses.Refusal.LowSimilarity = "custom low similarity score={score} threshold={threshold}"
 	gen := &fakeGenerator{resp: llm.GenerationResponse{
 		Answer:    "provider-worded refusal",
 		Citations: nil,
@@ -205,24 +202,11 @@ func TestUsesConfiguredRefusalMessages(t *testing.T) {
 	if out.RefusalReason != "provider-worded refusal" {
 		t.Fatalf("unexpected no retrieval refusal: %q", out.RefusalReason)
 	}
-
-	low := New(cfg, fakeRetriever{results: []types.RetrievalResult{{
-		Chunk:      types.Chunk{ID: "c1", Citation: "c1", Path: "a.md", Text: "text"},
-		Similarity: 0.10,
-	}}}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
-	lowOut, err := low.Ask(context.Background(), "question")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lowOut.RefusalReason == cfg.Responses.Refusal.LowSimilarity {
-		t.Fatalf("expected placeholder-expanded low-similarity refusal")
-	}
 }
 
 func TestFallbackRefusalRotatesVariants(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
-	cfg.Responses.Refusal.NoRetrieval = "I can only answer when local evidence is relevant enough (top similarity {score} < threshold {threshold})."
 	gen := &fakeGenerator{err: errors.New("provider down")}
 	svc := New(cfg, fakeRetriever{}, gen, policy.NewValidator(cfg.Validation.MinEvidenceCoverage))
 
