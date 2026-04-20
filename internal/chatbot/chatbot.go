@@ -12,11 +12,11 @@ import (
 )
 
 type Service struct {
+	refusalSeq atomic.Uint64
 	cfg        config.Config
 	retriever  Retriever
 	gen        llm.GenerationProvider
 	validator  Validator
-	refusalSeq uint64
 }
 
 type Retriever interface {
@@ -29,6 +29,26 @@ type Validator interface {
 
 func New(cfg config.Config, retriever Retriever, gen llm.GenerationProvider, validator Validator) *Service {
 	return &Service{cfg: cfg, retriever: retriever, gen: gen, validator: validator}
+}
+
+var genericRefusalVariants = []string{
+	"Sorry, but I could not relate your question to the content I have.",
+	"Sorry, I could not connect that question to the material available to me.",
+	"Sorry, I can’t find enough relevant material to answer that question.",
+	"Sorry, that question does not seem to match the content I can use right now.",
+}
+
+var technicalRefusalTerms = []string{
+	"threshold",
+	"similarity",
+	"score",
+	"confidence",
+	"retriev",
+	"evidence",
+	"local content",
+	"chunk",
+	"index",
+	"policy",
 }
 
 func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, error) {
@@ -103,35 +123,16 @@ func (s *Service) fallbackRefusal(configured string) string {
 	if configured != "" && isGenericRefusal(configured) {
 		return configured
 	}
-	variants := []string{
-		"Sorry, but I could not relate your question to the content I have.",
-		"Sorry, I could not connect that question to the material available to me.",
-		"Sorry, I can’t find enough relevant material to answer that question.",
-		"Sorry, that question does not seem to match the content I can use right now.",
-	}
-	next := atomic.AddUint64(&s.refusalSeq, 1)
-	return variants[(next-1)%uint64(len(variants))]
+	next := s.refusalSeq.Add(1)
+	return genericRefusalVariants[(next-1)%uint64(len(genericRefusalVariants))]
 }
 
 func isGenericRefusal(msg string) bool {
-	msg = strings.TrimSpace(msg)
 	if msg == "" {
 		return false
 	}
 	lower := strings.ToLower(msg)
-	banned := []string{
-		"threshold",
-		"similarity",
-		"score",
-		"confidence",
-		"retriev",
-		"evidence",
-		"local content",
-		"chunk",
-		"index",
-		"policy",
-	}
-	for _, term := range banned {
+	for _, term := range technicalRefusalTerms {
 		if strings.Contains(lower, term) {
 			return false
 		}
