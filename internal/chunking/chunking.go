@@ -33,7 +33,7 @@ func SplitText(path, text string, chunkSize, overlap int) []types.Chunk {
 			continue
 		}
 		id := makeID(path, i, chunkText)
-		out = append(out, types.Chunk{ID: id, Path: path, Text: chunkText})
+		out = append(out, types.Chunk{ID: id, Citation: id, Path: path, Text: chunkText})
 		if end == len(runes) {
 			break
 		}

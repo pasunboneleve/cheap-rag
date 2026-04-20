@@ -109,7 +109,11 @@ func entityMismatches(answer, evidence string) []string {
 func citationSet(citations []string, evidence []types.RetrievalResult) map[string]struct{} {
 	evidenceIDs := map[string]struct{}{}
 	for _, e := range evidence {
-		evidenceIDs[e.Chunk.ID] = struct{}{}
+		cite := strings.TrimSpace(e.Chunk.Citation)
+		if cite == "" {
+			cite = e.Chunk.ID
+		}
+		evidenceIDs[cite] = struct{}{}
 	}
 	out := map[string]struct{}{}
 	for _, c := range citations {
@@ -124,7 +128,11 @@ func evidenceConcat(evidence []types.RetrievalResult, citations map[string]struc
 	var sb strings.Builder
 	for _, e := range evidence {
 		if len(citations) > 0 {
-			if _, ok := citations[e.Chunk.ID]; !ok {
+			cite := strings.TrimSpace(e.Chunk.Citation)
+			if cite == "" {
+				cite = e.Chunk.ID
+			}
+			if _, ok := citations[cite]; !ok {
 				continue
 			}
 		}

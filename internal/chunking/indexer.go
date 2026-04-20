@@ -17,16 +17,18 @@ type Indexer struct {
 	guard        *fsguard.Guard
 	embeddings   llm.EmbeddingsProvider
 	embedModel   string
+	citePattern  string
 	store        *store.SQLiteStore
 	chunkSize    int
 	chunkOverlap int
 }
 
-func NewIndexer(guard *fsguard.Guard, embeddings llm.EmbeddingsProvider, embedModel string, st *store.SQLiteStore) *Indexer {
+func NewIndexer(guard *fsguard.Guard, embeddings llm.EmbeddingsProvider, embedModel string, citationPattern string, st *store.SQLiteStore) *Indexer {
 	return &Indexer{
 		guard:        guard,
 		embeddings:   embeddings,
 		embedModel:   embedModel,
+		citePattern:  citationPattern,
 		store:        st,
 		chunkSize:    800,
 		chunkOverlap: 120,
@@ -70,6 +72,7 @@ func (i *Indexer) Run(ctx context.Context) (int, error) {
 			return fmt.Errorf("embedding count mismatch for %s", path)
 		}
 		for idx := range chunks {
+			chunks[idx].Citation = FormatCitation(i.citePattern, chunks[idx], idx)
 			records = append(records, store.Record{Chunk: chunks[idx], Vector: vectors[idx]})
 		}
 		return nil

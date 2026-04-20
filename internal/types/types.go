@@ -2,9 +2,10 @@ package types
 
 // Chunk is an indexed document fragment.
 type Chunk struct {
-	ID   string
-	Path string
-	Text string
+	ID       string
+	Citation string
+	Path     string
+	Text     string
 }
 
 // RetrievalResult contains a retrieved chunk and similarity score.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 
@@ -41,6 +42,7 @@ func (s *SQLiteStore) migrate() error {
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS chunks (
   id TEXT PRIMARY KEY,
+  citation TEXT NOT NULL,
   path TEXT NOT NULL,
   text TEXT NOT NULL
 );
@@ -54,7 +56,21 @@ CREATE TABLE IF NOT EXISTS embeddings (
 	if err != nil {
 		return fmt.Errorf("migrate sqlite: %w", err)
 	}
+	if err := s.ensureCitationColumn(); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *SQLiteStore) ensureCitationColumn() error {
+	_, err := s.db.Exec(`ALTER TABLE chunks ADD COLUMN citation TEXT NOT NULL DEFAULT ''`)
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return nil
+	}
+	return fmt.Errorf("ensure citation column: %w", err)
 }
 
 func (s *SQLiteStore) ReplaceAll(ctx context.Context, records []Record) error {
@@ -83,7 +99,11 @@ func insertOne(ctx context.Context, tx *sql.Tx, r Record) error {
 		return err
 	}
 	norm := vectorNorm(r.Vector)
-	if _, err := tx.ExecContext(ctx, `INSERT INTO chunks(id, path, text) VALUES(?,?,?)`, r.Chunk.ID, r.Chunk.Path, r.Chunk.Text); err != nil {
+	citation := strings.TrimSpace(r.Chunk.Citation)
+	if citation == "" {
+		citation = r.Chunk.ID
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO chunks(id, citation, path, text) VALUES(?,?,?,?)`, r.Chunk.ID, citation, r.Chunk.Path, r.Chunk.Text); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO embeddings(chunk_id, vector_json, norm) VALUES(?,?,?)`, r.Chunk.ID, string(vecJSON), norm); err != nil {
@@ -94,7 +114,7 @@ func insertOne(ctx context.Context, tx *sql.Tx, r Record) error {
 
 func (s *SQLiteStore) Query(ctx context.Context, query []float64, topK int) ([]types.RetrievalResult, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT c.id, c.path, c.text, e.vector_json, e.norm
+SELECT c.id, c.citation, c.path, c.text, e.vector_json, e.norm
 FROM chunks c
 JOIN embeddings e ON e.chunk_id = c.id`)
 	if err != nil {
@@ -108,9 +128,9 @@ JOIN embeddings e ON e.chunk_id = c.id`)
 	}
 	var results []types.RetrievalResult
 	for rows.Next() {
-		var id, path, text, vectorJSON string
+		var id, citation, path, text, vectorJSON string
 		var norm float64
-		if err := rows.Scan(&id, &path, &text, &vectorJSON, &norm); err != nil {
+		if err := rows.Scan(&id, &citation, &path, &text, &vectorJSON, &norm); err != nil {
 			return nil, err
 		}
 		var vec []float64
@@ -119,7 +139,7 @@ JOIN embeddings e ON e.chunk_id = c.id`)
 		}
 		score := cosine(query, qNorm, vec, norm)
 		results = append(results, types.RetrievalResult{
-			Chunk:      types.Chunk{ID: id, Path: path, Text: text},
+			Chunk:      types.Chunk{ID: id, Citation: citation, Path: path, Text: text},
 			Similarity: score,
 		})
 	}

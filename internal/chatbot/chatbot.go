@@ -41,7 +41,7 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
-		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Path: r.Chunk.Path, Text: r.Chunk.Text})
+		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Citation: r.Chunk.Citation, Path: r.Chunk.Path, Text: r.Chunk.Text})
 	}
 	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
 		Question:     question,

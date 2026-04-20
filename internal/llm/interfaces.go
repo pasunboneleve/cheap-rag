@@ -18,9 +18,10 @@ type GenerationRequest struct {
 
 // EvidenceChunk is grounding evidence passed to the model.
 type EvidenceChunk struct {
-	ID   string
-	Path string
-	Text string
+	ID       string
+	Citation string
+	Path     string
+	Text     string
 }
 
 // GenerationResponse is a structured answer with citations.

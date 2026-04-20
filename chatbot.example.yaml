@@ -4,6 +4,7 @@ generation_provider: gemini
 embedding_provider: gemini
 model: gemini-2.0-flash
 embedding_model: gemini-embedding-001
+citation_pattern: "{chunk_id}"
 retrieval:
   top_k: 5
   min_query_similarity: 0.45

@@ -62,12 +62,19 @@ Required fields:
 - `embedding_provider`
 - `model`
 - `embedding_model`
+- `citation_pattern` (optional, default `{chunk_id}`)
 - `retrieval.top_k`
 - `retrieval.min_query_similarity`
 - `validation.min_evidence_coverage`
 
 Backward compatibility:
 - Legacy `provider` is still accepted and applied to both generation and embeddings.
+
+Citation pattern placeholders:
+- `{chunk_id}` internal stable chunk ID
+- `{path}` relative content path
+- `{slug}` filename without extension
+- `{chunk_index}` index of chunk inside its source file
 
 API keys:
 - Gemini: `GEMINI_API_KEY`
@@ -106,6 +113,12 @@ go run ./cmd/chatbot shell \
   --embedding-provider gemini \
   --model grok-4-0709 \
   --embedding-model gemini-embedding-001
+```
+
+Blog slug citation example:
+
+```yaml
+citation_pattern: "{slug}"
 ```
 
 ## Guardrail behaviour examples

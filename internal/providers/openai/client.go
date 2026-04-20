@@ -136,13 +136,19 @@ func buildPrompt(req llm.GenerationRequest) string {
 	for _, c := range req.Evidence {
 		sb.WriteString("- ID: ")
 		sb.WriteString(c.ID)
+		sb.WriteString(" | Cite as: ")
+		if strings.TrimSpace(c.Citation) != "" {
+			sb.WriteString(c.Citation)
+		} else {
+			sb.WriteString(c.ID)
+		}
 		sb.WriteString(" | Path: ")
 		sb.WriteString(c.Path)
 		sb.WriteString("\n")
 		sb.WriteString(c.Text)
 		sb.WriteString("\n\n")
 	}
-	sb.WriteString(`Output JSON only: {"answer":"...","citations":["chunk_id"]}`)
+	sb.WriteString(`Output JSON only: {"answer":"...","citations":["citation_value"]}`)
 	return sb.String()
 }
 

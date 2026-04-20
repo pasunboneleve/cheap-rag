@@ -18,6 +18,7 @@ type Config struct {
 	EmbeddingProvider  string           `yaml:"embedding_provider"`
 	Model              string           `yaml:"model"`
 	EmbeddingModel     string           `yaml:"embedding_model"`
+	CitationPattern    string           `yaml:"citation_pattern"`
 	Retrieval          RetrievalConfig  `yaml:"retrieval"`
 	Validation         ValidationConfig `yaml:"validation"`
 }
@@ -39,6 +40,7 @@ func Default() Config {
 		EmbeddingProvider:  "openai-compatible",
 		Model:              "gpt-4o-mini",
 		EmbeddingModel:     "text-embedding-3-small",
+		CitationPattern:    "{chunk_id}",
 		Retrieval: RetrievalConfig{
 			TopK:               5,
 			MinQuerySimilarity: 0.45,
@@ -65,7 +67,7 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationProvider, embeddingProvider, model, embeddingModel string) {
+func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationProvider, embeddingProvider, model, embeddingModel, citationPattern string) {
 	if contentRoot != "" {
 		c.ContentRoot = contentRoot
 	}
@@ -90,6 +92,9 @@ func (c *Config) ApplyOverrides(contentRoot, runtimeRoot, provider, generationPr
 	if embeddingModel != "" {
 		c.EmbeddingModel = embeddingModel
 	}
+	if citationPattern != "" {
+		c.CitationPattern = citationPattern
+	}
 }
 
 func (c *Config) Validate() error {
@@ -104,6 +109,9 @@ func (c *Config) Validate() error {
 	}
 	if c.GenerationProvider == "" || c.EmbeddingProvider == "" || c.Model == "" || c.EmbeddingModel == "" {
 		return errors.New("generation_provider, embedding_provider, model and embedding_model are required (legacy provider also accepted)")
+	}
+	if c.CitationPattern == "" {
+		c.CitationPattern = "{chunk_id}"
 	}
 	if c.Retrieval.TopK <= 0 {
 		return errors.New("retrieval.top_k must be > 0")
