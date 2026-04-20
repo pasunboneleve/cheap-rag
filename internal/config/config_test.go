@@ -56,3 +56,16 @@ func TestValidateRejectsAnthropicTemperatureAboveOne(t *testing.T) {
 		t.Fatalf("expected anthropic temperature validation error")
 	}
 }
+
+func TestValidateBackfillsRuntimeSocketPathFromRuntimeRoot(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.Runtime.SocketPath = ""
+	cfg.RuntimeRoot = "/tmp/cheap-rag-runtime"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected valid config: %v", err)
+	}
+	if cfg.Runtime.SocketPath != "/tmp/cheap-rag-runtime/cheap-rag.sock" {
+		t.Fatalf("unexpected socket path: %s", cfg.Runtime.SocketPath)
+	}
+}

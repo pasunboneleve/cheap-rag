@@ -5,15 +5,21 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"math"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/dmvianna/cheap-rag/internal/chatbot"
 	"github.com/dmvianna/cheap-rag/internal/chunking"
 	"github.com/dmvianna/cheap-rag/internal/config"
 	"github.com/dmvianna/cheap-rag/internal/fsguard"
+	"github.com/dmvianna/cheap-rag/internal/httpserver"
 	"github.com/dmvianna/cheap-rag/internal/llm"
 	"github.com/dmvianna/cheap-rag/internal/policy"
 	"github.com/dmvianna/cheap-rag/internal/providers"
@@ -41,6 +47,8 @@ func run(ctx context.Context, args []string) error {
 		return runAsk(ctx, args[1:])
 	case "shell":
 		return runShell(ctx, args[1:])
+	case "serve":
+		return runServe(ctx, args[1:])
 	case "inspect":
 		return runInspect(ctx, args[1:])
 	default:
@@ -132,6 +140,57 @@ func runInspect(ctx context.Context, args []string) error {
 		}
 		fmt.Printf("%s score=%.4f path=%s cite_as=%s\n", res.Chunk.ID, res.Similarity, res.Chunk.Path, cite)
 	}
+	return nil
+}
+
+func runServe(ctx context.Context, args []string) error {
+	cfg, _, err := parseConfigFlags("serve", args)
+	if err != nil {
+		return err
+	}
+	service, st, err := buildService(cfg)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+	listener, cleanup, err := httpserver.ListenUnixSocket(cfg.Runtime.SocketPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := cleanup(); err != nil {
+			logger.Printf("socket cleanup error: %v", err)
+		}
+	}()
+
+	httpSrv := &http.Server{
+		Handler:      httpserver.New(service, cfg.InternalToken, logger).Handler(),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	sigCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-sigCtx.Done()
+		logger.Printf("shutdown signal received")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			logger.Printf("shutdown error: %v", err)
+		}
+	}()
+
+	logger.Printf("cheap-rag server starting")
+	logger.Printf("listening on unix socket %s", cfg.Runtime.SocketPath)
+	err = httpSrv.Serve(listener)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	logger.Printf("server stopped")
 	return nil
 }
 
@@ -227,6 +286,7 @@ func parseConfigFlags(cmd string, args []string) (config.Config, []string, error
 	}
 	cfg.ContentRoot = absOrOriginal(cfg.ContentRoot)
 	cfg.RuntimeRoot = absOrOriginal(cfg.RuntimeRoot)
+	cfg.Runtime.SocketPath = absOrOriginal(cfg.Runtime.SocketPath)
 	return cfg, fs.Args(), nil
 }
 
@@ -239,5 +299,5 @@ func absOrOriginal(p string) string {
 }
 
 func usageError() error {
-	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot --citation-pattern \"{chunk_id}\"\n  chatbot shell --content ./content --runtime ./.chatbot --generation-provider xai --embedding-provider gemini --model grok-4-1-fast-reasoning --generation-temperature 0.7 --embedding-model gemini-embedding-001 --citation-pattern \"{slug}\"\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
+	return errors.New("usage:\n  chatbot index --content ./content --runtime ./.chatbot --citation-pattern \"{chunk_id}\"\n  chatbot shell --content ./content --runtime ./.chatbot --generation-provider xai --embedding-provider gemini --model grok-4-1-fast-reasoning --generation-temperature 0.7 --embedding-model gemini-embedding-001 --citation-pattern \"{slug}\"\n  chatbot serve --config ./chatbot.yaml\n  chatbot ask --config ./chatbot.yaml \"what is cheap to change?\"\n  chatbot inspect query --config ./chatbot.yaml \"ci cd\"")
 }

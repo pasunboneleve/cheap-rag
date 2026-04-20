@@ -17,6 +17,7 @@ Not designed for scale. When scale becomes a bottleneck, replace it.
 - `internal/retrieval`: embed query and fetch top-k by cosine similarity
 - `internal/policy`: practical v1 answer validation against retrieved evidence
 - `internal/chatbot`: orchestration service that applies retrieval gate + generation + validation
+- `internal/httpserver`: local-only HTTP-over-unix-socket server (`/healthz`, `/ask`)
 - `internal/repl`: interactive shell
 
 ## Why retrieval is the gatekeeper
@@ -62,6 +63,8 @@ Example: [`chatbot.example.yaml`](chatbot.example.yaml)
 Required fields:
 - `content_root`
 - `runtime_root`
+- `runtime.socket_path` (unix socket path for `serve`)
+- `internal_token` (optional Bearer token for local internal auth)
 - `generation_provider`
 - `embedding_provider`
 - `model`
@@ -95,9 +98,45 @@ API keys:
 ```bash
 go run ./cmd/chatbot index --config ./chatbot.example.yaml
 go run ./cmd/chatbot shell --config ./chatbot.example.yaml
+go run ./cmd/chatbot serve --config ./chatbot.example.yaml
 go run ./cmd/chatbot ask --config ./chatbot.example.yaml "what is cheap to change?"
 go run ./cmd/chatbot inspect query --config ./chatbot.example.yaml "ci cd"
 ```
+
+## Unix socket API
+
+When running `serve`, cheap-rag listens on `runtime.socket_path` using HTTP over a Unix domain socket only.
+
+Endpoints:
+- `GET /healthz` -> `200 OK`
+- `POST /ask`
+
+Request body:
+
+```json
+{
+  "question": "how can I build software that is cheap to change?"
+}
+```
+
+Response body:
+
+```json
+{
+  "answer": "Use short feedback loops and explicit boundaries...",
+  "refusal": null,
+  "retrieval": [
+    {"chunk_id":"chunk_1","similarity":0.73,"path":"post.md","citation":"my-post-slug"}
+  ]
+}
+```
+
+## Security model
+
+- No TCP listener is opened.
+- Server binds only to the configured Unix socket path.
+- Socket file is recreated on startup and chmod'd to `0660`.
+- If `internal_token` is set, requests must include `Authorization: Bearer <token>`.
 
 You can also override config fields with flags:
 
@@ -169,6 +208,45 @@ Sample grounded answer shape:
 - runtime root cannot be nested under content root
 - path traversal attempts are rejected
 - symlink escapes outside roots are rejected
+
+## Go client example (unix socket)
+
+```go
+package main
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"time"
+)
+
+func main() {
+	socketPath := "/tmp/cheap-rag.sock"
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
+			},
+		},
+		Timeout: 15 * time.Second,
+	}
+	body := []byte(`{"question":"what is cheap to change?"}`)
+	req, _ := http.NewRequest(http.MethodPost, "http://unix/ask", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	// req.Header.Set("Authorization", "Bearer <internal_token>")
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(b))
+}
+```
 
 ## Current scope and stubs
 

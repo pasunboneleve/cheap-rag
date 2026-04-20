@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,6 +15,8 @@ import (
 type Config struct {
 	ContentRoot           string           `yaml:"content_root"`
 	RuntimeRoot           string           `yaml:"runtime_root"`
+	Runtime               RuntimeConfig    `yaml:"runtime"`
+	InternalToken         string           `yaml:"internal_token"`
 	Provider              string           `yaml:"provider"` // legacy fallback for both providers
 	GenerationProvider    string           `yaml:"generation_provider"`
 	EmbeddingProvider     string           `yaml:"embedding_provider"`
@@ -24,6 +27,10 @@ type Config struct {
 	Responses             ResponsesConfig  `yaml:"responses"`
 	Retrieval             RetrievalConfig  `yaml:"retrieval"`
 	Validation            ValidationConfig `yaml:"validation"`
+}
+
+type RuntimeConfig struct {
+	SocketPath string `yaml:"socket_path"`
 }
 
 type RetrievalConfig struct {
@@ -46,8 +53,11 @@ type RefusalResponses struct {
 
 func Default() Config {
 	return Config{
-		ContentRoot:           "./content",
-		RuntimeRoot:           "./.chatbot",
+		ContentRoot: "./content",
+		RuntimeRoot: "./.chatbot",
+		Runtime: RuntimeConfig{
+			SocketPath: "./.chatbot/cheap-rag.sock",
+		},
 		GenerationProvider:    "openai-compatible",
 		EmbeddingProvider:     "openai-compatible",
 		Model:                 "gpt-4o-mini",
@@ -134,6 +144,9 @@ func (c *Config) Validate() error {
 	}
 	if c.CitationPattern == "" {
 		c.CitationPattern = "{chunk_id}"
+	}
+	if strings.TrimSpace(c.Runtime.SocketPath) == "" {
+		c.Runtime.SocketPath = filepath.Join(c.RuntimeRoot, "cheap-rag.sock")
 	}
 	if c.GenerationTemperature < 0 || c.GenerationTemperature > 2 {
 		return errors.New("generation_temperature must be between 0 and 2")
