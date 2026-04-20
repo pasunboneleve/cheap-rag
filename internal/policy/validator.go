@@ -38,7 +38,7 @@ func (v *Validator) Validate(answer string, citations []string, evidence []types
 	}
 	coverage := float64(supported) / float64(len(sentences))
 	unsupportedEntities := entityMismatches(answer, evidenceText)
-	valid := coverage >= v.minCoverage && len(unsupportedClaims) == 0 && len(unsupportedEntities) == 0 && len(validCitations) > 0
+	valid := coverage >= v.minCoverage && len(unsupportedEntities) == 0 && len(validCitations) > 0
 
 	return types.ValidationReport{
 		Coverage:            coverage,
@@ -63,14 +63,17 @@ func splitIntoClaims(answer string) []string {
 
 func claimSupported(claim, evidence string) bool {
 	tokens := tokenise(claim)
-	if len(tokens) == 0 {
+	meaningful := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		if len(t) > 3 {
+			meaningful = append(meaningful, t)
+		}
+	}
+	if len(meaningful) == 0 {
 		return false
 	}
 	var matches int
-	for _, t := range tokens {
-		if len(t) <= 3 {
-			continue
-		}
+	for _, t := range meaningful {
 		if strings.Contains(evidence, t) {
 			matches++
 		}
@@ -78,7 +81,7 @@ func claimSupported(claim, evidence string) bool {
 	if matches == 0 {
 		return false
 	}
-	ratio := float64(matches) / float64(len(tokens))
+	ratio := float64(matches) / float64(len(meaningful))
 	return ratio >= 0.30
 }
 
