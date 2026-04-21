@@ -4,6 +4,19 @@ All notable changes to `cheap-rag` will be recorded in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-21
+
+### Fixed
+- Renamed CLI invocation from `chatbot` to `cheaprag` across command path,
+  examples, and release build outputs.
+- Replaced weak usage-error output with explicit top-level and subcommand help,
+  including config-vs-flag/provider resolution guidance.
+- Added CLI help regression tests covering no-args/help paths and representative
+  subcommand help output.
+- Prevented release notes loss in dual-asset releases by making the non-notes
+  release path upload assets without mutating release body.
+- Hardened pre-commit formatting hook to skip deleted staged `.go` paths.
+
 ## [0.2.0] - 2026-04-21
 
 ### Added
