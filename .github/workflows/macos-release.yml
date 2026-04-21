@@ -15,6 +15,6 @@ jobs:
       runner: macos-14
       goos: darwin
       goarch: arm64
-      binary_name: cheap-rag
-      archive_name: cheap-rag-darwin-arm64.tar.gz
+      binary_name: cheaprag
+      archive_name: cheaprag-darwin-arm64.tar.gz
       publish_release_notes: false

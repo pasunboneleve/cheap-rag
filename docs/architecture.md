@@ -4,7 +4,7 @@ cheap-rag keeps core logic explicit and local.
 
 ## Package breakdown
 
-- `cmd/chatbot`: thin CLI edge for `index`, `ask`, `shell`, `inspect query`, `serve`
+- `cmd/cheaprag`: thin CLI edge for `index`, `ask`, `shell`, `inspect query`, `serve`
 - `internal/config`: YAML config with explicit thresholds and split generation/embedding provider settings
 - `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
 - `internal/chunking`: deterministic chunking and indexing orchestration

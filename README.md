@@ -32,11 +32,11 @@ Pipeline:
 ## Quick start
 
 ```bash
-go run ./cmd/chatbot index --config ./chatbot.example.yaml
-go run ./cmd/chatbot shell --config ./chatbot.example.yaml
-go run ./cmd/chatbot serve --config ./chatbot.example.yaml
-go run ./cmd/chatbot ask --config ./chatbot.example.yaml "what is cheap to change?"
-go run ./cmd/chatbot inspect query --config ./chatbot.example.yaml "ci cd"
+go run ./cmd/cheaprag index --config ./cheaprag.example.yaml
+go run ./cmd/cheaprag shell --config ./cheaprag.example.yaml
+go run ./cmd/cheaprag serve --config ./cheaprag.example.yaml
+go run ./cmd/cheaprag ask --config ./cheaprag.example.yaml "what is cheap to change?"
+go run ./cmd/cheaprag inspect query --config ./cheaprag.example.yaml "ci cd"
 ```
 
 ## API example
