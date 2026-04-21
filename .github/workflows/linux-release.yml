@@ -15,6 +15,6 @@ jobs:
       runner: ubuntu-latest
       goos: linux
       goarch: amd64
-      binary_name: cheap-rag
-      archive_name: cheap-rag-linux-amd64.tar.gz
+      binary_name: cheaprag
+      archive_name: cheaprag-linux-amd64.tar.gz
       publish_release_notes: true

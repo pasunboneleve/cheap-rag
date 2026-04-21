@@ -22,7 +22,7 @@ func New(service *chatbot.Service, in io.Reader, out io.Writer) *Shell {
 
 func (s *Shell) Run(ctx context.Context) error {
 	scanner := bufio.NewScanner(s.in)
-	fmt.Fprintln(s.out, "chatbot shell. type ':quit' to exit.")
+	fmt.Fprintln(s.out, "cheaprag shell. type ':quit' to exit.")
 	for {
 		fmt.Fprint(s.out, "> ")
 		if !scanner.Scan() {

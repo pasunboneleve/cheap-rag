@@ -1,6 +1,6 @@
 # Configuration
 
-Example config: [`chatbot.example.yaml`](../chatbot.example.yaml)
+Example config: [`cheaprag.example.yaml`](../cheaprag.example.yaml)
 
 ## Required fields
 
@@ -62,7 +62,7 @@ citation_pattern: "{slug}"
 ## CLI overrides
 
 ```bash
-go run ./cmd/chatbot shell \
+go run ./cmd/cheaprag shell \
   --content ./content \
   --runtime ./.chatbot \
   --generation-provider gemini \
@@ -76,7 +76,7 @@ xAI generation + Gemini embeddings:
 
 ```bash
 export XAI_API_KEY=...
-go run ./cmd/chatbot shell \
+go run ./cmd/cheaprag shell \
   --content ./content \
   --runtime ./.chatbot \
   --generation-provider xai \
@@ -90,7 +90,7 @@ Anthropic generation + OpenAI embeddings:
 ```bash
 export ANTHROPIC_API_KEY=...
 export OPENAI_API_KEY=...
-go run ./cmd/chatbot shell \
+go run ./cmd/cheaprag shell \
   --content ./content \
   --runtime ./.chatbot \
   --generation-provider anthropic \
