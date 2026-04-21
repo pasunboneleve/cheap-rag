@@ -1,0 +1,17 @@
+name: Linux CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    uses: ./.github/workflows/go-ci-reusable.yml
+    with:
+      runner: ubuntu-latest

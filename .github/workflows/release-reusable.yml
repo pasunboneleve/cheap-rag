@@ -1,0 +1,84 @@
+name: Release reusable
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      goos:
+        required: true
+        type: string
+      goarch:
+        required: true
+        type: string
+      binary_name:
+        required: true
+        type: string
+      archive_name:
+        required: true
+        type: string
+      publish_release_notes:
+        required: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate changelog has tag section
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -q "^## \[$version\] - " CHANGELOG.md; then
+            echo "changelog missing section for version $version" >&2
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          GOOS="${{ inputs.goos }}" GOARCH="${{ inputs.goarch }}" CGO_ENABLED=0 \
+            go build -o "dist/${{ inputs.binary_name }}" ./cmd/chatbot
+
+      - name: Package release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -C dist -czf "${{ inputs.archive_name }}" "${{ inputs.binary_name }}"
+
+      - name: Extract release notes from changelog
+        if: inputs.publish_release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/release-notes-from-changelog.sh "${GITHUB_REF_NAME#v}" "${GITHUB_REPOSITORY}" > release-notes.md
+
+      - name: Publish GitHub release asset
+        if: inputs.publish_release_notes
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ inputs.archive_name }}
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+
+      - name: Publish GitHub release asset without notes
+        if: ${{ !inputs.publish_release_notes }}
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ inputs.archive_name }}
+          fail_on_unmatched_files: true

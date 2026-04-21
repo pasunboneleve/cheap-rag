@@ -1,0 +1,20 @@
+name: Linux release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-reusable.yml
+    with:
+      runner: ubuntu-latest
+      goos: linux
+      goarch: amd64
+      binary_name: cheap-rag
+      archive_name: cheap-rag-linux-amd64.tar.gz
+      publish_release_notes: true

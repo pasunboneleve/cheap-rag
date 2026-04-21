@@ -1,0 +1,30 @@
+name: Go CI Reusable
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          test -z "$(gofmt -l .)"
+
+      - name: Run tests
+        run: go test ./...
