@@ -8,6 +8,7 @@ import (
 
 	"github.com/dmvianna/cheap-rag/internal/config"
 	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/providerdiag"
 	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
@@ -27,6 +28,24 @@ type Validator interface {
 	Validate(answer string, citations []string, evidence []types.RetrievalResult) types.ValidationReport
 }
 
+type AskError struct {
+	Err              error
+	ProviderStatuses map[string]int
+}
+
+func (e *AskError) Error() string { return e.Err.Error() }
+func (e *AskError) Unwrap() error { return e.Err }
+func (e *AskError) ProviderStatusMap() map[string]int {
+	if len(e.ProviderStatuses) == 0 {
+		return nil
+	}
+	out := make(map[string]int, len(e.ProviderStatuses))
+	for k, v := range e.ProviderStatuses {
+		out[k] = v
+	}
+	return out
+}
+
 func New(cfg config.Config, retriever Retriever, gen llm.GenerationProvider, validator Validator) *Service {
 	return &Service{cfg: cfg, retriever: retriever, gen: gen, validator: validator}
 }
@@ -39,21 +58,26 @@ var genericRefusalVariants = []string{
 }
 
 func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, error) {
-	retrieved, err := s.retriever.Retrieve(ctx, question, s.cfg.Retrieval.TopK)
+	diagCtx, tracker := providerdiag.WithTracker(ctx)
+	retrieved, err := s.retriever.Retrieve(diagCtx, question, s.cfg.Retrieval.TopK)
 	if err != nil {
-		return types.AskOutcome{}, err
+		return types.AskOutcome{}, &AskError{Err: err, ProviderStatuses: tracker.Snapshot()}
 	}
 	if len(retrieved) == 0 {
-		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.NoRetrieval)
+		out, err := s.refuseWithProvider(providerdiag.WithStage(diagCtx, "generation"), retrieved, s.cfg.Responses.Refusal.NoRetrieval)
+		out.ProviderStatuses = tracker.Snapshot()
+		return out, err
 	}
 	if retrieved[0].Similarity < s.cfg.Retrieval.MinQuerySimilarity {
-		return s.refuseWithProvider(ctx, retrieved, s.cfg.Responses.Refusal.LowSimilarity)
+		out, err := s.refuseWithProvider(providerdiag.WithStage(diagCtx, "generation"), retrieved, s.cfg.Responses.Refusal.LowSimilarity)
+		out.ProviderStatuses = tracker.Snapshot()
+		return out, err
 	}
 	evidence := make([]llm.EvidenceChunk, 0, len(retrieved))
 	for _, r := range retrieved {
 		evidence = append(evidence, llm.EvidenceChunk{ID: r.Chunk.ID, Citation: r.Chunk.Citation, Path: r.Chunk.Path, Text: r.Chunk.Text})
 	}
-	genResp, err := s.gen.Generate(ctx, llm.GenerationRequest{
+	genResp, err := s.gen.Generate(providerdiag.WithStage(diagCtx, "generation"), llm.GenerationRequest{
 		Question:     question,
 		Evidence:     evidence,
 		Model:        s.cfg.Model,
@@ -61,7 +85,7 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 		SystemPolicy: policyPrompt(),
 	})
 	if err != nil {
-		return types.AskOutcome{}, fmt.Errorf("generate answer: %w", err)
+		return types.AskOutcome{}, &AskError{Err: fmt.Errorf("generate answer: %w", err), ProviderStatuses: tracker.Snapshot()}
 	}
 	citations := sanitizeCitations(genResp.Citations)
 	if len(citations) == 0 {
@@ -69,10 +93,11 @@ func (s *Service) Ask(ctx context.Context, question string) (types.AskOutcome, e
 	}
 	report := s.validator.Validate(genResp.Answer, citations, retrieved)
 	return types.AskOutcome{
-		Answer:     genResp.Answer,
-		Citations:  citations,
-		Retrieved:  retrieved,
-		Validation: report,
+		Answer:           genResp.Answer,
+		Citations:        citations,
+		Retrieved:        retrieved,
+		ProviderStatuses: tracker.Snapshot(),
+		Validation:       report,
 	}, nil
 }
 

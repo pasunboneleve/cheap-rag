@@ -127,6 +127,7 @@ Response body:
   "content": "Use short feedback loops and explicit boundaries...",
   "reason": null,
   "query_similarity": 0.73,
+  "provider_statuses": {"embedding": 200, "generation": 200},
   "retrieval": [
     {"chunk_id":"chunk_1","similarity":0.73,"path":"post.md","citation":"my-post-slug"}
   ]
@@ -147,7 +148,7 @@ Refusal example:
 
 `reason` is `null` on successful answers. Refusal reasons include `out-of-scope`, `provider-timeout`, and `provider-error`.
 
-`provider_statuses` is for provider HTTP diagnostics, e.g. `{"embedding":401}` or `{"generation":504}`.
+`provider_statuses` carries provider HTTP responses when available, including success (for example `{"embedding":200,"generation":200}`) and failure diagnostics (for example `{"embedding":401}` or `{"generation":504}`).
 
 ## Security model
 

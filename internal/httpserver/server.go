@@ -23,6 +23,10 @@ type Asker interface {
 	Ask(ctx context.Context, question string) (types.AskOutcome, error)
 }
 
+type providerStatusError interface {
+	ProviderStatusMap() map[string]int
+}
+
 type Server struct {
 	asker Asker
 	token string
@@ -110,11 +114,12 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	querySimilarity := topSimilarity(out.Retrieved)
 	resp := askResponse{
-		Outcome:    "answer",
-		Content:    out.Answer,
-		Reason:     nil,
-		Similarity: querySimilarity,
-		Retrieval:  toRetrievalResponse(out.Retrieved),
+		Outcome:          "answer",
+		Content:          out.Answer,
+		Reason:           nil,
+		ProviderStatuses: copyStatuses(out.ProviderStatuses),
+		Similarity:       querySimilarity,
+		Retrieval:        toRetrievalResponse(out.Retrieved),
 	}
 	if out.Refused {
 		reason := "out-of-scope"
@@ -172,15 +177,22 @@ func topSimilarity(in []types.RetrievalResult) *float64 {
 
 func classifyAskError(err error) (string, map[string]int) {
 	msg := strings.ToLower(err.Error())
-	status := providerStatusCode(err)
 	statuses := map[string]int{}
-	if status != nil {
-		source := "generation"
-		if strings.Contains(msg, "embed query") {
-			source = "embedding"
+	if withStatuses, ok := err.(providerStatusError); ok {
+		for k, v := range withStatuses.ProviderStatusMap() {
+			statuses[k] = v
 		}
-		statuses[source] = *status
+	} else {
+		status := providerStatusCode(err)
+		if status != nil {
+			source := "generation"
+			if strings.Contains(msg, "embed query") {
+				source = "embedding"
+			}
+			statuses[source] = *status
+		}
 	}
+	status := pickAnyStatus(statuses)
 	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout") {
 		return "provider-timeout", statusesOrNil(statuses)
 	}
@@ -207,6 +219,25 @@ func statusesOrNil(in map[string]int) map[string]int {
 		return nil
 	}
 	return in
+}
+
+func copyStatuses(in map[string]int) map[string]int {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]int, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func pickAnyStatus(in map[string]int) *int {
+	for _, v := range in {
+		vv := v
+		return &vv
+	}
+	return nil
 }
 
 func ListenUnixSocket(socketPath string) (net.Listener, func() error, error) {

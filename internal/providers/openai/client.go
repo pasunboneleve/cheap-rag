@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/providerdiag"
 )
 
 type Client struct {
@@ -115,6 +116,7 @@ func (c *Client) postJSON(ctx context.Context, url string, body any, out any) er
 		return fmt.Errorf("http request: %w", err)
 	}
 	defer res.Body.Close()
+	providerdiag.RecordStatus(ctx, res.StatusCode)
 	b, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)

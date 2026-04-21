@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/providerdiag"
 	"github.com/dmvianna/cheap-rag/internal/store"
 	"github.com/dmvianna/cheap-rag/internal/types"
 )
@@ -20,7 +21,7 @@ func New(embeddings llm.EmbeddingsProvider, st *store.SQLiteStore, embeddingMode
 }
 
 func (r *Retriever) Retrieve(ctx context.Context, query string, topK int) ([]types.RetrievalResult, error) {
-	vectors, err := r.embeddings.Embed(ctx, []string{query}, r.model)
+	vectors, err := r.embeddings.Embed(providerdiag.WithStage(ctx, "embedding"), []string{query}, r.model)
 	if err != nil {
 		return nil, fmt.Errorf("embed query: %w", err)
 	}

@@ -21,6 +21,7 @@ type AskOutcome struct {
 	Answer        string
 	Citations     []string
 	Retrieved     []RetrievalResult
+	ProviderStatuses map[string]int
 	Validation    ValidationReport
 }
 

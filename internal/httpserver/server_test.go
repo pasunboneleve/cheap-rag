@@ -52,6 +52,10 @@ func TestAskReturnsJSON(t *testing.T) {
 	asker := fakeAsker{
 		out: types.AskOutcome{
 			Answer: "ok",
+			ProviderStatuses: map[string]int{
+				"embedding":  200,
+				"generation": 200,
+			},
 			Retrieved: []types.RetrievalResult{{
 				Chunk:      types.Chunk{ID: "c1", Citation: "slug", Path: "a.md"},
 				Similarity: 0.7,
@@ -77,6 +81,13 @@ func TestAskReturnsJSON(t *testing.T) {
 	}
 	if body["reason"] != nil {
 		t.Fatalf("expected null reason on answer, got %#v", body["reason"])
+	}
+	statuses, ok := body["provider_statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider_statuses map, got %#v", body["provider_statuses"])
+	}
+	if statuses["embedding"] != float64(200) || statuses["generation"] != float64(200) {
+		t.Fatalf("unexpected provider statuses: %#v", statuses)
 	}
 }
 
