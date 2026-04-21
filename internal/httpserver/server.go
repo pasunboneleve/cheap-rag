@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -32,9 +34,13 @@ type askRequest struct {
 }
 
 type askResponse struct {
-	Answer    string              `json:"answer"`
-	Refusal   *string             `json:"refusal"`
-	Retrieval []retrievalResponse `json:"retrieval"`
+	Outcome      string              `json:"outcome"`
+	Content      string              `json:"content"`
+	Reason       string              `json:"reason"`
+	ProviderCode *int                `json:"provider_status,omitempty"`
+	Similarity   *float64            `json:"query_similarity,omitempty"`
+	Retrieval    []retrievalResponse `json:"retrieval"`
+	Statuses     map[string]any      `json:"statuses,omitempty"`
 }
 
 type retrievalResponse struct {
@@ -43,6 +49,8 @@ type retrievalResponse struct {
 	Path       string  `json:"path"`
 	Citation   string  `json:"citation"`
 }
+
+var apiStatusRe = regexp.MustCompile(`api status\s+(\d+)`)
 
 func New(asker Asker, token string, logger *log.Logger) *Server {
 	return &Server{
@@ -90,18 +98,32 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	out, err := s.asker.Ask(r.Context(), question)
 	if err != nil {
 		s.log.Printf("ask error: %v", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		reason, providerStatus := classifyAskError(err)
+		resp := askResponse{
+			Outcome:      "refusal",
+			Content:      "Sorry, I don't know how to answer this.",
+			Reason:       reason,
+			ProviderCode: providerStatus,
+			Retrieval:    []retrievalResponse{},
+		}
+		writeJSON(w, http.StatusOK, resp)
 		return
 	}
+	querySimilarity := topSimilarity(out.Retrieved)
 	resp := askResponse{
-		Answer:    out.Answer,
-		Refusal:   nil,
-		Retrieval: toRetrievalResponse(out.Retrieved),
+		Outcome:    "answer",
+		Content:    out.Answer,
+		Reason:     "none",
+		Similarity: querySimilarity,
+		Retrieval:  toRetrievalResponse(out.Retrieved),
+		Statuses: map[string]any{
+			"validation_ok": out.Validation.Valid,
+		},
 	}
 	if out.Refused {
-		resp.Answer = ""
-		ref := out.RefusalReason
-		resp.Refusal = &ref
+		resp.Outcome = "refusal"
+		resp.Content = out.RefusalReason
+		resp.Reason = "out-of-scope"
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -141,6 +163,38 @@ func toRetrievalResponse(in []types.RetrievalResult) []retrievalResponse {
 		})
 	}
 	return out
+}
+
+func topSimilarity(in []types.RetrievalResult) *float64 {
+	if len(in) == 0 {
+		return nil
+	}
+	score := in[0].Similarity
+	return &score
+}
+
+func classifyAskError(err error) (string, *int) {
+	msg := strings.ToLower(err.Error())
+	status := providerStatusCode(err)
+	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout") {
+		return "provider-timeout", status
+	}
+	if status != nil && (*status == http.StatusRequestTimeout || *status == http.StatusGatewayTimeout) {
+		return "provider-timeout", status
+	}
+	return "provider-error", status
+}
+
+func providerStatusCode(err error) *int {
+	m := apiStatusRe.FindStringSubmatch(err.Error())
+	if len(m) != 2 {
+		return nil
+	}
+	n, convErr := strconv.Atoi(m[1])
+	if convErr != nil {
+		return nil
+	}
+	return &n
 }
 
 func ListenUnixSocket(socketPath string) (net.Listener, func() error, error) {

@@ -123,13 +123,32 @@ Response body:
 
 ```json
 {
-  "answer": "Use short feedback loops and explicit boundaries...",
-  "refusal": null,
+  "outcome": "answer",
+  "content": "Use short feedback loops and explicit boundaries...",
+  "reason": "none",
+  "query_similarity": 0.73,
+  "provider_status": null,
   "retrieval": [
     {"chunk_id":"chunk_1","similarity":0.73,"path":"post.md","citation":"my-post-slug"}
-  ]
+  ],
+  "statuses": {"validation_ok": true}
 }
 ```
+
+Refusal example:
+
+```json
+{
+  "outcome": "refusal",
+  "content": "Sorry, I don't know how to answer this.",
+  "reason": "out-of-scope",
+  "query_similarity": 0.18,
+  "provider_status": null,
+  "retrieval": []
+}
+```
+
+`reason` values include `out-of-scope`, `provider-timeout`, and `provider-error`.
 
 ## Security model
 

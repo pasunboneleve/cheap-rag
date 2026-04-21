@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -68,8 +69,60 @@ func TestAskReturnsJSON(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body["answer"] != "ok" {
-		t.Fatalf("expected answer 'ok', got %#v", body["answer"])
+	if body["outcome"] != "answer" {
+		t.Fatalf("expected outcome answer, got %#v", body["outcome"])
+	}
+	if body["content"] != "ok" {
+		t.Fatalf("expected content 'ok', got %#v", body["content"])
+	}
+}
+
+func TestAskRefusalReturnsRefusalOutcome(t *testing.T) {
+	t.Parallel()
+	asker := fakeAsker{
+		out: types.AskOutcome{
+			Refused:       true,
+			RefusalReason: "Sorry, I don't know how to answer this.",
+		},
+	}
+	srv := New(asker, "", discardLogger())
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["outcome"] != "refusal" {
+		t.Fatalf("expected outcome refusal, got %#v", body["outcome"])
+	}
+	if body["reason"] != "out-of-scope" {
+		t.Fatalf("expected reason out-of-scope, got %#v", body["reason"])
+	}
+}
+
+func TestAskErrorReturnsProviderTimeoutReason(t *testing.T) {
+	t.Parallel()
+	asker := fakeAsker{err: errors.New("api status 504: upstream timeout")}
+	srv := New(asker, "", discardLogger())
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["outcome"] != "refusal" {
+		t.Fatalf("expected refusal, got %#v", body["outcome"])
+	}
+	if body["reason"] != "provider-timeout" {
+		t.Fatalf("expected provider-timeout, got %#v", body["reason"])
 	}
 }
 
