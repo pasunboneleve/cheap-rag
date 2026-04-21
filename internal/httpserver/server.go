@@ -201,11 +201,6 @@ func classifyAskError(err error) (string, map[string]int) {
 			return "provider-timeout", statusesOrNil(statuses)
 		}
 	}
-	for _, s := range statuses {
-		if s >= 400 {
-			return "provider-error", statusesOrNil(statuses)
-		}
-	}
 	return "provider-error", statusesOrNil(statuses)
 }
 
