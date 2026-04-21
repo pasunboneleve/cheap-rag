@@ -75,6 +75,9 @@ func TestAskReturnsJSON(t *testing.T) {
 	if body["content"] != "ok" {
 		t.Fatalf("expected content 'ok', got %#v", body["content"])
 	}
+	if body["reason"] != nil {
+		t.Fatalf("expected null reason on answer, got %#v", body["reason"])
+	}
 }
 
 func TestAskRefusalReturnsRefusalOutcome(t *testing.T) {
@@ -124,8 +127,12 @@ func TestAskErrorReturnsProviderTimeoutReason(t *testing.T) {
 	if body["reason"] != "provider-timeout" {
 		t.Fatalf("expected provider-timeout, got %#v", body["reason"])
 	}
-	if body["provider_status"] != float64(504) {
-		t.Fatalf("expected provider_status 504, got %#v", body["provider_status"])
+	statuses, ok := body["provider_statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider_statuses map, got %#v", body["provider_statuses"])
+	}
+	if statuses["generation"] != float64(504) {
+		t.Fatalf("expected generation status 504, got %#v", statuses["generation"])
 	}
 }
 
@@ -146,8 +153,31 @@ func TestAskErrorReturnsProviderErrorReason(t *testing.T) {
 	if body["reason"] != "provider-error" {
 		t.Fatalf("expected provider-error, got %#v", body["reason"])
 	}
-	if _, ok := body["provider_status"]; ok {
-		t.Fatalf("expected no provider_status for generic error, got %#v", body["provider_status"])
+	if _, ok := body["provider_statuses"]; ok {
+		t.Fatalf("expected no provider_statuses for generic error, got %#v", body["provider_statuses"])
+	}
+}
+
+func TestAskErrorSetsEmbeddingProviderStatus(t *testing.T) {
+	t.Parallel()
+	asker := fakeAsker{err: errors.New("embed query: api status 401: unauthorized")}
+	srv := New(asker, "", discardLogger())
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	statuses, ok := body["provider_statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider_statuses map, got %#v", body["provider_statuses"])
+	}
+	if statuses["embedding"] != float64(401) {
+		t.Fatalf("expected embedding status 401, got %#v", statuses["embedding"])
 	}
 }
 

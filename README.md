@@ -125,13 +125,11 @@ Response body:
 {
   "outcome": "answer",
   "content": "Use short feedback loops and explicit boundaries...",
-  "reason": "none",
+  "reason": null,
   "query_similarity": 0.73,
-  "provider_status": null,
   "retrieval": [
     {"chunk_id":"chunk_1","similarity":0.73,"path":"post.md","citation":"my-post-slug"}
-  ],
-  "statuses": {"validation_ok": true}
+  ]
 }
 ```
 
@@ -143,12 +141,13 @@ Refusal example:
   "content": "Sorry, I don't know how to answer this.",
   "reason": "out-of-scope",
   "query_similarity": 0.18,
-  "provider_status": null,
   "retrieval": []
 }
 ```
 
-`reason` values include `out-of-scope`, `provider-timeout`, and `provider-error`.
+`reason` is `null` on successful answers. Refusal reasons include `out-of-scope`, `provider-timeout`, and `provider-error`.
+
+`provider_statuses` is for provider HTTP diagnostics, e.g. `{"embedding":401}` or `{"generation":504}`.
 
 ## Security model
 

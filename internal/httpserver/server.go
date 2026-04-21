@@ -34,13 +34,12 @@ type askRequest struct {
 }
 
 type askResponse struct {
-	Outcome      string              `json:"outcome"`
-	Content      string              `json:"content"`
-	Reason       string              `json:"reason"`
-	ProviderCode *int                `json:"provider_status,omitempty"`
-	Similarity   *float64            `json:"query_similarity,omitempty"`
-	Retrieval    []retrievalResponse `json:"retrieval"`
-	Statuses     map[string]any      `json:"statuses,omitempty"`
+	Outcome          string              `json:"outcome"`
+	Content          string              `json:"content"`
+	Reason           *string             `json:"reason"`
+	ProviderStatuses map[string]int      `json:"provider_statuses,omitempty"`
+	Similarity       *float64            `json:"query_similarity,omitempty"`
+	Retrieval        []retrievalResponse `json:"retrieval"`
 }
 
 type retrievalResponse struct {
@@ -98,13 +97,13 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	out, err := s.asker.Ask(r.Context(), question)
 	if err != nil {
 		s.log.Printf("ask error: %v", err)
-		reason, providerStatus := classifyAskError(err)
+		reason, statuses := classifyAskError(err)
 		resp := askResponse{
-			Outcome:      "refusal",
-			Content:      "Sorry, I don't know how to answer this.",
-			Reason:       reason,
-			ProviderCode: providerStatus,
-			Retrieval:    []retrievalResponse{},
+			Outcome:          "refusal",
+			Content:          "Sorry, I don't know how to answer this.",
+			Reason:           &reason,
+			ProviderStatuses: statuses,
+			Retrieval:        []retrievalResponse{},
 		}
 		writeJSON(w, http.StatusOK, resp)
 		return
@@ -113,17 +112,15 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	resp := askResponse{
 		Outcome:    "answer",
 		Content:    out.Answer,
-		Reason:     "none",
+		Reason:     nil,
 		Similarity: querySimilarity,
 		Retrieval:  toRetrievalResponse(out.Retrieved),
-		Statuses: map[string]any{
-			"validation_ok": out.Validation.Valid,
-		},
 	}
 	if out.Refused {
+		reason := "out-of-scope"
 		resp.Outcome = "refusal"
 		resp.Content = out.RefusalReason
-		resp.Reason = "out-of-scope"
+		resp.Reason = &reason
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -173,16 +170,24 @@ func topSimilarity(in []types.RetrievalResult) *float64 {
 	return &score
 }
 
-func classifyAskError(err error) (string, *int) {
+func classifyAskError(err error) (string, map[string]int) {
 	msg := strings.ToLower(err.Error())
 	status := providerStatusCode(err)
+	statuses := map[string]int{}
+	if status != nil {
+		source := "generation"
+		if strings.Contains(msg, "embed query") {
+			source = "embedding"
+		}
+		statuses[source] = *status
+	}
 	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout") {
-		return "provider-timeout", status
+		return "provider-timeout", statusesOrNil(statuses)
 	}
 	if status != nil && (*status == http.StatusRequestTimeout || *status == http.StatusGatewayTimeout) {
-		return "provider-timeout", status
+		return "provider-timeout", statusesOrNil(statuses)
 	}
-	return "provider-error", status
+	return "provider-error", statusesOrNil(statuses)
 }
 
 func providerStatusCode(err error) *int {
@@ -195,6 +200,13 @@ func providerStatusCode(err error) *int {
 		return nil
 	}
 	return &n
+}
+
+func statusesOrNil(in map[string]int) map[string]int {
+	if len(in) == 0 {
+		return nil
+	}
+	return in
 }
 
 func ListenUnixSocket(socketPath string) (net.Listener, func() error, error) {
