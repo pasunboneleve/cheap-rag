@@ -4,6 +4,32 @@ All notable changes to `cheap-rag` will be recorded in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-21
+
+### Added
+- Repository automation baseline:
+  - Linux and macOS CI workflows
+  - Linux and macOS release workflows plus reusable release workflow
+  - release notes extraction script
+  - release schedule documentation
+  - repository hooks integration via `.envrc` and `hooks/`
+- Expanded documentation set under `docs/`:
+  - architecture
+  - config
+  - API
+  - storage
+  - security
+  - validation
+- README CI badges for Linux and macOS workflows.
+
+### Changed
+- Refactored the top-level README into a high-signal quick overview, with
+  detailed reference content moved to `docs/`.
+
+### Fixed
+- Hardened unix-socket listener test portability on macOS by shortening the
+  test socket path in `TestListenUnixSocketCleansUp`.
+
 ## [0.1.0] - 2026-04-21
 
 ### Added
