@@ -124,6 +124,31 @@ func TestAskErrorReturnsProviderTimeoutReason(t *testing.T) {
 	if body["reason"] != "provider-timeout" {
 		t.Fatalf("expected provider-timeout, got %#v", body["reason"])
 	}
+	if body["provider_status"] != float64(504) {
+		t.Fatalf("expected provider_status 504, got %#v", body["provider_status"])
+	}
+}
+
+func TestAskErrorReturnsProviderErrorReason(t *testing.T) {
+	t.Parallel()
+	asker := fakeAsker{err: errors.New("db open failed")}
+	srv := New(asker, "", discardLogger())
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["reason"] != "provider-error" {
+		t.Fatalf("expected provider-error, got %#v", body["reason"])
+	}
+	if _, ok := body["provider_status"]; ok {
+		t.Fatalf("expected no provider_status for generic error, got %#v", body["provider_status"])
+	}
 }
 
 func TestListenUnixSocketCleansUp(t *testing.T) {

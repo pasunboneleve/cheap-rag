@@ -50,7 +50,7 @@ type retrievalResponse struct {
 	Citation   string  `json:"citation"`
 }
 
-var apiStatusRe = regexp.MustCompile(`api status\s+(\d+)`)
+var apiStatusRe = regexp.MustCompile(`(?i)api status\s+(\d+)`)
 
 func New(asker Asker, token string, logger *log.Logger) *Server {
 	return &Server{
