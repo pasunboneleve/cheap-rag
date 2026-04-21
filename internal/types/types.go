@@ -16,13 +16,13 @@ type RetrievalResult struct {
 
 // AskOutcome captures a guarded model response.
 type AskOutcome struct {
-	Refused       bool
-	RefusalReason string
-	Answer        string
-	Citations     []string
-	Retrieved     []RetrievalResult
+	Refused          bool
+	RefusalReason    string
+	Answer           string
+	Citations        []string
+	Retrieved        []RetrievalResult
 	ProviderStatuses map[string]int
-	Validation    ValidationReport
+	Validation       ValidationReport
 }
 
 // ValidationReport contains deterministic validation signals.
