@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dmvianna/cheap-rag/internal/llm"
-	"github.com/dmvianna/cheap-rag/internal/netretry"
-	"github.com/dmvianna/cheap-rag/internal/providerdiag"
+	"github.com/pasunboneleve/cheap-rag/internal/llm"
+	"github.com/pasunboneleve/cheap-rag/internal/netretry"
+	"github.com/pasunboneleve/cheap-rag/internal/providerdiag"
 )
 
 type Client struct {

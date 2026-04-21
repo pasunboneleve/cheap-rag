@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dmvianna/cheap-rag/internal/config"
-	"github.com/dmvianna/cheap-rag/internal/llm"
-	"github.com/dmvianna/cheap-rag/internal/policy"
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/config"
+	"github.com/pasunboneleve/cheap-rag/internal/llm"
+	"github.com/pasunboneleve/cheap-rag/internal/policy"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 type fakeRetriever struct {

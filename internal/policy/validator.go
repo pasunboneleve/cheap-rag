@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 var splitSentences = regexp.MustCompile(`[.!?]\s+`)

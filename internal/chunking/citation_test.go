@@ -3,7 +3,7 @@ package chunking
 import (
 	"testing"
 
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 func TestFormatCitationSlugPattern(t *testing.T) {

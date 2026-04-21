@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/dmvianna/cheap-rag/internal/chatbot"
+	"github.com/pasunboneleve/cheap-rag/internal/chatbot"
 )
 
 type Shell struct {

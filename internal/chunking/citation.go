@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 // FormatCitation builds a citation token from a template.

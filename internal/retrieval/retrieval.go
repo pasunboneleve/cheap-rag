@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dmvianna/cheap-rag/internal/llm"
-	"github.com/dmvianna/cheap-rag/internal/providerdiag"
-	"github.com/dmvianna/cheap-rag/internal/store"
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/llm"
+	"github.com/pasunboneleve/cheap-rag/internal/providerdiag"
+	"github.com/pasunboneleve/cheap-rag/internal/store"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 type Retriever struct {

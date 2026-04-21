@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dmvianna/cheap-rag/internal/chatbot"
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/chatbot"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 type fakeAsker struct {

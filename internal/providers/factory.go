@@ -3,11 +3,11 @@ package providers
 import (
 	"fmt"
 
-	"github.com/dmvianna/cheap-rag/internal/llm"
-	"github.com/dmvianna/cheap-rag/internal/providers/anthropic"
-	"github.com/dmvianna/cheap-rag/internal/providers/gemini"
-	"github.com/dmvianna/cheap-rag/internal/providers/openai"
-	"github.com/dmvianna/cheap-rag/internal/providers/xai"
+	"github.com/pasunboneleve/cheap-rag/internal/llm"
+	"github.com/pasunboneleve/cheap-rag/internal/providers/anthropic"
+	"github.com/pasunboneleve/cheap-rag/internal/providers/gemini"
+	"github.com/pasunboneleve/cheap-rag/internal/providers/openai"
+	"github.com/pasunboneleve/cheap-rag/internal/providers/xai"
 )
 
 func NewEmbeddings(name string) (llm.EmbeddingsProvider, error) {

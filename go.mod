@@ -1,4 +1,4 @@
-module github.com/dmvianna/cheap-rag
+module github.com/pasunboneleve/cheap-rag
 
 go 1.25.8
 

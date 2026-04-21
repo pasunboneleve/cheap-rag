@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 type Asker interface {

@@ -12,7 +12,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/dmvianna/cheap-rag/internal/types"
+	"github.com/pasunboneleve/cheap-rag/internal/types"
 )
 
 type SQLiteStore struct {
