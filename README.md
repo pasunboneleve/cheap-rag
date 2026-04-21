@@ -9,96 +9,27 @@ question. Otherwise, it refuses.
 This is the intended shape for this project.
 Not designed for scale. When scale becomes a bottleneck, replace it.
 
-## Architecture overview
+## Why this exists
 
-- `cmd/chatbot`: thin CLI edge for `index`, `ask`, `shell`, `inspect query`
-- `internal/config`: YAML config with explicit thresholds and split generation/embedding provider settings
-- `internal/fsguard`: hard boundary enforcement between `content_root` (read-only) and `runtime_root` (write-only for chatbot state)
-- `internal/chunking`: deterministic chunking and indexing orchestration
-- `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`, `anthropic`) for embeddings + generation
-- `internal/store`: SQLite-backed local vector store (inspectable, local, boring)
-- `internal/retrieval`: embed query and fetch top-k by cosine similarity
-- `internal/policy`: practical answer validation against retrieved evidence
-- `internal/chatbot`: orchestration service that applies retrieval gate + generation + validation
-- `internal/httpserver`: local-only HTTP-over-unix-socket server (`/healthz`, `/ask`)
-- `internal/repl`: interactive shell
+This project keeps deterministic guardrails in front of a stochastic model.
+Retrieval decides whether the model is allowed to speak.
 
-## Why retrieval is the gatekeeper
+If local evidence is out of scope, cheap-rag refuses.
+If local evidence is in scope, cheap-rag answers from that evidence.
 
-The model is only allowed to answer if retrieval passes a deterministic threshold (`retrieval.min_query_similarity`).
+## Architecture
 
-- If top similarity is below threshold: refuse out-of-scope.
-- If retrieval has no results: refuse out-of-scope.
-- Generation happens only after retrieval passes.
+Pipeline:
 
-This keeps stochastic generation behind a deterministic scope gate.
+`embed -> retrieve -> gate -> generate -> validate`
 
-## Why validation is limited
+- embed: turn the question into a vector
+- retrieve: fetch top-k local chunks by similarity
+- gate: refuse if similarity/evidence is insufficient
+- generate: answer only from retrieved chunks
+- validate: lightweight checks for evidence coverage/support
 
-Validation is intentionally simple and inspectable:
-
-- checks claim-token overlap against cited evidence text
-- checks unsupported named entities against evidence text
-- requires citations to map to retrieved chunk IDs
-- applies `validation.min_evidence_coverage`
-
-This is not a formal truth verifier. It reduces obvious unsupported claims while keeping complexity low.
-
-## Vector store choice and tradeoffs
-
-cheap-rag uses SQLite (`modernc.org/sqlite`) with vectors stored as JSON and cosine scoring in Go.
-
-Pros:
-- inspectable local file (`runtime_root/index.sqlite`)
-- minimal moving parts
-- simple migration path to ANN later
-
-Cons:
-- full scan query path is slower at larger scales
-- no approximate nearest neighbour index yet
-
-This is the intended baseline for cheap, inspectable deployments, not high-scale workloads.
-
-## Configuration
-
-Example: [`chatbot.example.yaml`](chatbot.example.yaml)
-
-Required fields:
-- `content_root`
-- `runtime_root`
-- `runtime.socket_path` (unix socket path for `serve`)
-- `server.max_inflight_requests` (max concurrent `/ask` requests; saturation returns `503`)
-- `server.max_request_body_bytes` (max `/ask` request payload size; oversized body returns `413`)
-- `internal_token` (optional Bearer token for local internal auth)
-- `generation_provider`
-- `embedding_provider`
-- `model`
-- `generation_temperature` (optional, 0-2, default `0.4`)
-  - Note: when `generation_provider: anthropic`, temperature must be `<= 1.0`.
-- `embedding_model`
-- `citation_pattern` (optional, default `{chunk_id}`)
-- `responses.refusal.no_retrieval` (optional seed sentence for refusal rephrasing)
-- `responses.refusal.low_similarity` (optional seed sentence for refusal rephrasing)
-- `retrieval.top_k`
-- `retrieval.min_query_similarity`
-- `validation.min_evidence_coverage`
-
-Backward compatibility:
-- Legacy `provider` is still accepted and applied to both generation and embeddings.
-
-Citation pattern placeholders:
-- `{chunk_id}` internal stable chunk ID
-- `{path}` relative content path
-- `{slug}` filename without extension
-- `{chunk_index}` index of chunk inside its source file
-
-API keys:
-- Gemini: `GEMINI_API_KEY`
-- OpenAI-compatible: `OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`)
-- xAI: `XAI_API_KEY` (and optional `XAI_BASE_URL`, default `https://api.x.ai/v1`)
-- Anthropic (generation): `ANTHROPIC_API_KEY` (optional `ANTHROPIC_BASE_URL`, `ANTHROPIC_VERSION`)
-
-## Run
+## Quick start
 
 ```bash
 go run ./cmd/chatbot index --config ./chatbot.example.yaml
@@ -108,29 +39,11 @@ go run ./cmd/chatbot ask --config ./chatbot.example.yaml "what is cheap to chang
 go run ./cmd/chatbot inspect query --config ./chatbot.example.yaml "ci cd"
 ```
 
-## Unix socket API
+## API example
 
 When running `serve`, cheap-rag listens on `runtime.socket_path` using HTTP over a Unix domain socket only.
 
-Concurrency and retry behaviour:
-- `/ask` is bounded by `server.max_inflight_requests` to avoid unbounded concurrent work.
-- `/ask` request bodies are capped by `server.max_request_body_bytes`.
-- Provider HTTP calls retry once on transient failures (`429`, `5xx`, or clear transport timeouts), with a short jittered backoff.
-- Provider HTTP calls do not retry `400`, `401`, or `403`.
-
-Endpoints:
-- `GET /healthz` -> `200 OK`
-- `POST /ask`
-
-Request body:
-
-```json
-{
-  "question": "how can I build software that is cheap to change?"
-}
-```
-
-Response body:
+Success:
 
 ```json
 {
@@ -145,7 +58,7 @@ Response body:
 }
 ```
 
-Refusal example:
+Refusal:
 
 ```json
 {
@@ -157,123 +70,27 @@ Refusal example:
 }
 ```
 
-`reason` is `null` on successful answers. Refusal reasons include `out-of-scope`, `provider-timeout`, and `provider-error`.
+## Key ideas
 
-`provider_statuses` carries provider HTTP responses when available, including success (for example `{"embedding":200,"generation":200}`) and failure diagnostics (for example `{"embedding":401}` or `{"generation":504}`).
+- retrieval is the gatekeeper: generation happens only after retrieval passes scope checks
+- validation is intentionally limited: useful heuristics, not a formal truth system
+- local + inspectable beats scalable-by-default for this project
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Configuration](docs/config.md)
+- [API](docs/api.md)
+- [Storage](docs/storage.md)
+- [Security](docs/security.md)
+- [Validation](docs/validation.md)
+- [Release schedule](docs/release-schedule.md)
 
 ## Security model
 
-- No TCP listener is opened.
-- Server binds only to the configured Unix socket path.
-- Socket file is recreated on startup and chmod'd to `0660`.
-- If `internal_token` is set, requests must include `Authorization: Bearer <token>`.
+- no TCP listener is opened
+- server binds only to the configured Unix socket path
+- socket file is recreated on startup and chmod'd to `0660`
+- if `internal_token` is set, requests must include `Authorization: Bearer <token>`
 
-You can also override config fields with flags:
-
-```bash
-go run ./cmd/chatbot shell \
-  --content ./content \
-  --runtime ./.chatbot \
-  --generation-provider gemini \
-  --embedding-provider gemini \
-  --model gemini-2.0-flash \
-  --generation-temperature 0.5 \
-  --embedding-model gemini-embedding-001
-```
-
-xAI example:
-
-```bash
-export XAI_API_KEY=...
-go run ./cmd/chatbot shell \
-  --content ./content \
-  --runtime ./.chatbot \
-  --generation-provider xai \
-  --embedding-provider gemini \
-  --model grok-4-0709 \
-  --embedding-model gemini-embedding-001
-```
-
-Anthropic generation + OpenAI embeddings example:
-
-```bash
-export ANTHROPIC_API_KEY=...
-export OPENAI_API_KEY=...
-go run ./cmd/chatbot shell \
-  --content ./content \
-  --runtime ./.chatbot \
-  --generation-provider anthropic \
-  --embedding-provider openai-compatible \
-  --model claude-sonnet-4-5 \
-  --embedding-model text-embedding-3-small
-```
-
-Blog slug citation example:
-
-```yaml
-citation_pattern: "{slug}"
-```
-
-## Guardrail behaviour examples
-
-Sample refusal message:
-
-```text
-Sorry, but I could not relate your question to the content I have.
-```
-
-Sample grounded answer shape:
-
-```json
-{
-  "answer": "Cheap change is mainly about reducing coupling and using explicit interfaces so changes stay local.",
-  "citations": ["chunk_123abc"]
-}
-```
-
-## Path and filesystem safety
-
-- content is read only from `content_root`
-- runtime files are written only under `runtime_root`
-- runtime root cannot be nested under content root
-- path traversal attempts are rejected
-- symlink escapes outside roots are rejected
-
-## Go client example (unix socket)
-
-```go
-package main
-
-import (
-	"bytes"
-	"context"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"time"
-)
-
-func main() {
-	socketPath := "/tmp/cheap-rag.sock"
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
-			},
-		},
-		Timeout: 15 * time.Second,
-	}
-	body := []byte(`{"question":"what is cheap to change?"}`)
-	req, _ := http.NewRequest(http.MethodPost, "http://unix/ask", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("Authorization", "Bearer <internal_token>")
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	fmt.Println(string(b))
-}
-```
+See [docs/security.md](docs/security.md) for full details.
