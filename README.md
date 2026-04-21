@@ -4,6 +4,7 @@
 answers only when local content is sufficiently similar to the
 question. Otherwise, it refuses.
 
+This is the intended shape for this project.
 Not designed for scale. When scale becomes a bottleneck, replace it.
 
 ## Architecture overview
@@ -15,7 +16,7 @@ Not designed for scale. When scale becomes a bottleneck, replace it.
 - `internal/providers`: provider interfaces and implementations (`gemini`, `openai-compatible`, `xai`, `anthropic`) for embeddings + generation
 - `internal/store`: SQLite-backed local vector store (inspectable, local, boring)
 - `internal/retrieval`: embed query and fetch top-k by cosine similarity
-- `internal/policy`: practical v1 answer validation against retrieved evidence
+- `internal/policy`: practical answer validation against retrieved evidence
 - `internal/chatbot`: orchestration service that applies retrieval gate + generation + validation
 - `internal/httpserver`: local-only HTTP-over-unix-socket server (`/healthz`, `/ask`)
 - `internal/repl`: interactive shell
@@ -30,9 +31,9 @@ The model is only allowed to answer if retrieval passes a deterministic threshol
 
 This keeps stochastic generation behind a deterministic scope gate.
 
-## Why validation is limited in v1
+## Why validation is limited
 
-Validation in v1 is intentionally simple and inspectable:
+Validation is intentionally simple and inspectable:
 
 - checks claim-token overlap against cited evidence text
 - checks unsupported named entities against evidence text
@@ -266,19 +267,3 @@ func main() {
 	fmt.Println(string(b))
 }
 ```
-
-## Current scope and stubs
-
-Implemented:
-- CLI scaffold with index/ask/shell/inspect
-- provider abstractions and two concrete providers
-- retrieval threshold refusal
-- deterministic post-generation validation
-- SQLite local vector store
-- tests for path boundaries, out-of-scope refusal, retrieval threshold refusal, validation refusal
-
-Still minimal in v1:
-- no ANN index
-- no incremental indexing (current index replace is full rebuild)
-- simplistic claim/entity heuristics for validation
-- no structured logging pipeline yet
