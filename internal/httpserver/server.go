@@ -178,7 +178,8 @@ func topSimilarity(in []types.RetrievalResult) *float64 {
 func classifyAskError(err error) (string, map[string]int) {
 	msg := strings.ToLower(err.Error())
 	statuses := map[string]int{}
-	if withStatuses, ok := err.(providerStatusError); ok {
+	var withStatuses providerStatusError
+	if errors.As(err, &withStatuses) {
 		for k, v := range withStatuses.ProviderStatusMap() {
 			statuses[k] = v
 		}
@@ -192,12 +193,18 @@ func classifyAskError(err error) (string, map[string]int) {
 			statuses[source] = *status
 		}
 	}
-	status := pickAnyStatus(statuses)
 	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout") {
 		return "provider-timeout", statusesOrNil(statuses)
 	}
-	if status != nil && (*status == http.StatusRequestTimeout || *status == http.StatusGatewayTimeout) {
-		return "provider-timeout", statusesOrNil(statuses)
+	for _, s := range statuses {
+		if s == http.StatusRequestTimeout || s == http.StatusGatewayTimeout {
+			return "provider-timeout", statusesOrNil(statuses)
+		}
+	}
+	for _, s := range statuses {
+		if s >= 400 {
+			return "provider-error", statusesOrNil(statuses)
+		}
 	}
 	return "provider-error", statusesOrNil(statuses)
 }
@@ -230,14 +237,6 @@ func copyStatuses(in map[string]int) map[string]int {
 		out[k] = v
 	}
 	return out
-}
-
-func pickAnyStatus(in map[string]int) *int {
-	for _, v := range in {
-		vv := v
-		return &vv
-	}
-	return nil
 }
 
 func ListenUnixSocket(socketPath string) (net.Listener, func() error, error) {

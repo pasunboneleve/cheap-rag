@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dmvianna/cheap-rag/internal/chatbot"
 	"github.com/dmvianna/cheap-rag/internal/types"
 )
 
@@ -189,6 +190,38 @@ func TestAskErrorSetsEmbeddingProviderStatus(t *testing.T) {
 	}
 	if statuses["embedding"] != float64(401) {
 		t.Fatalf("expected embedding status 401, got %#v", statuses["embedding"])
+	}
+}
+
+func TestAskErrorClassificationUsesAnyErrorStatus(t *testing.T) {
+	t.Parallel()
+	asker := fakeAsker{err: &chatbot.AskError{
+		Err: errors.New("generate answer: api status 500"),
+		ProviderStatuses: map[string]int{
+			"embedding":  200,
+			"generation": 500,
+		},
+	}}
+	srv := New(asker, "", discardLogger())
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["reason"] != "provider-error" {
+		t.Fatalf("expected provider-error, got %#v", body["reason"])
+	}
+	statuses, ok := body["provider_statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider_statuses map, got %#v", body["provider_statuses"])
+	}
+	if statuses["embedding"] != float64(200) || statuses["generation"] != float64(500) {
+		t.Fatalf("unexpected statuses %#v", statuses)
 	}
 }
 
