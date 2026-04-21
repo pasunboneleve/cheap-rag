@@ -166,7 +166,10 @@ func runServe(ctx context.Context, args []string) error {
 	}()
 
 	httpSrv := &http.Server{
-		Handler:      httpserver.New(service, cfg.InternalToken, logger).Handler(),
+		Handler: httpserver.NewWithLimits(service, cfg.InternalToken, logger, httpserver.Limits{
+			MaxInflightRequests: int(cfg.Server.MaxInflightRequests),
+			MaxRequestBodyBytes: cfg.Server.MaxRequestBodyBytes,
+		}).Handler(),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,

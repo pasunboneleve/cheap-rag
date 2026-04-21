@@ -28,9 +28,16 @@ type providerStatusError interface {
 }
 
 type Server struct {
-	asker Asker
-	token string
-	log   *log.Logger
+	asker               Asker
+	token               string
+	log                 *log.Logger
+	inflight            chan struct{}
+	maxRequestBodyBytes int64
+}
+
+type Limits struct {
+	MaxInflightRequests int
+	MaxRequestBodyBytes int64
 }
 
 type askRequest struct {
@@ -56,10 +63,25 @@ type retrievalResponse struct {
 var apiStatusRe = regexp.MustCompile(`(?i)api status\s+(\d+)`)
 
 func New(asker Asker, token string, logger *log.Logger) *Server {
+	return NewWithLimits(asker, token, logger, Limits{
+		MaxInflightRequests: 16,
+		MaxRequestBodyBytes: 16 * 1024,
+	})
+}
+
+func NewWithLimits(asker Asker, token string, logger *log.Logger, limits Limits) *Server {
+	if limits.MaxInflightRequests <= 0 {
+		limits.MaxInflightRequests = 16
+	}
+	if limits.MaxRequestBodyBytes <= 0 {
+		limits.MaxRequestBodyBytes = 16 * 1024
+	}
 	return &Server{
-		asker: asker,
-		token: strings.TrimSpace(token),
-		log:   logger,
+		asker:               asker,
+		token:               strings.TrimSpace(token),
+		log:                 logger,
+		inflight:            make(chan struct{}, limits.MaxInflightRequests),
+		maxRequestBodyBytes: limits.MaxRequestBodyBytes,
 	}
 }
 
@@ -88,8 +110,20 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
+	if !s.tryAcquireAskSlot() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "server is busy, try again"})
+		return
+	}
+	defer s.releaseAskSlot()
+
+	r.Body = http.MaxBytesReader(w, r.Body, s.maxRequestBodyBytes)
 	var req askRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json body"})
 		return
 	}
@@ -128,6 +162,22 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		resp.Reason = &reason
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) tryAcquireAskSlot() bool {
+	select {
+	case s.inflight <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) releaseAskSlot() {
+	select {
+	case <-s.inflight:
+	default:
+	}
 }
 
 func (s *Server) authorized(r *http.Request) bool {

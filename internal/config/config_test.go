@@ -69,3 +69,18 @@ func TestValidateBackfillsRuntimeSocketPathFromRuntimeRoot(t *testing.T) {
 		t.Fatalf("unexpected socket path: %s", cfg.Runtime.SocketPath)
 	}
 }
+
+func TestValidateRejectsInvalidServerLimits(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.Server.MaxInflightRequests = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected invalid max_inflight_requests error")
+	}
+
+	cfg = Default()
+	cfg.Server.MaxRequestBodyBytes = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected invalid max_request_body_bytes error")
+	}
+}

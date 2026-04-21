@@ -16,6 +16,7 @@ type Config struct {
 	ContentRoot           string           `yaml:"content_root"`
 	RuntimeRoot           string           `yaml:"runtime_root"`
 	Runtime               RuntimeConfig    `yaml:"runtime"`
+	Server                ServerConfig     `yaml:"server"`
 	InternalToken         string           `yaml:"internal_token"`
 	Provider              string           `yaml:"provider"` // legacy fallback for both providers
 	GenerationProvider    string           `yaml:"generation_provider"`
@@ -31,6 +32,11 @@ type Config struct {
 
 type RuntimeConfig struct {
 	SocketPath string `yaml:"socket_path"`
+}
+
+type ServerConfig struct {
+	MaxInflightRequests int64 `yaml:"max_inflight_requests"`
+	MaxRequestBodyBytes int64 `yaml:"max_request_body_bytes"`
 }
 
 type RetrievalConfig struct {
@@ -57,6 +63,10 @@ func Default() Config {
 		RuntimeRoot: "./.chatbot",
 		Runtime: RuntimeConfig{
 			SocketPath: "./.chatbot/cheap-rag.sock",
+		},
+		Server: ServerConfig{
+			MaxInflightRequests: 16,
+			MaxRequestBodyBytes: 16 * 1024,
 		},
 		GenerationProvider:    "openai-compatible",
 		EmbeddingProvider:     "openai-compatible",
@@ -147,6 +157,12 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.Runtime.SocketPath) == "" {
 		c.Runtime.SocketPath = filepath.Join(c.RuntimeRoot, "cheap-rag.sock")
+	}
+	if c.Server.MaxInflightRequests <= 0 {
+		return errors.New("server.max_inflight_requests must be > 0")
+	}
+	if c.Server.MaxRequestBodyBytes <= 0 {
+		return errors.New("server.max_request_body_bytes must be > 0")
 	}
 	if c.GenerationTemperature < 0 || c.GenerationTemperature > 2 {
 		return errors.New("generation_temperature must be between 0 and 2")

@@ -65,6 +65,8 @@ Required fields:
 - `content_root`
 - `runtime_root`
 - `runtime.socket_path` (unix socket path for `serve`)
+- `server.max_inflight_requests` (max concurrent `/ask` requests; saturation returns `503`)
+- `server.max_request_body_bytes` (max `/ask` request payload size; oversized body returns `413`)
 - `internal_token` (optional Bearer token for local internal auth)
 - `generation_provider`
 - `embedding_provider`
@@ -107,6 +109,12 @@ go run ./cmd/chatbot inspect query --config ./chatbot.example.yaml "ci cd"
 ## Unix socket API
 
 When running `serve`, cheap-rag listens on `runtime.socket_path` using HTTP over a Unix domain socket only.
+
+Concurrency and retry behaviour:
+- `/ask` is bounded by `server.max_inflight_requests` to avoid unbounded concurrent work.
+- `/ask` request bodies are capped by `server.max_request_body_bytes`.
+- Provider HTTP calls retry once on transient failures (`429`, `5xx`, or clear transport timeouts), with a short jittered backoff.
+- Provider HTTP calls do not retry `400`, `401`, or `403`.
 
 Endpoints:
 - `GET /healthz` -> `200 OK`

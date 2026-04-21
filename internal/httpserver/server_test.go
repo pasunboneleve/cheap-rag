@@ -11,7 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dmvianna/cheap-rag/internal/chatbot"
 	"github.com/dmvianna/cheap-rag/internal/types"
@@ -24,6 +26,18 @@ type fakeAsker struct {
 
 func (f fakeAsker) Ask(context.Context, string) (types.AskOutcome, error) {
 	return f.out, f.err
+}
+
+type blockingAsker struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingAsker) Ask(context.Context, string) (types.AskOutcome, error) {
+	b.once.Do(func() { close(b.started) })
+	<-b.release
+	return types.AskOutcome{Answer: "ok"}, nil
 }
 
 func TestHealthz(t *testing.T) {
@@ -222,6 +236,75 @@ func TestAskErrorClassificationUsesAnyErrorStatus(t *testing.T) {
 	}
 	if statuses["embedding"] != float64(200) || statuses["generation"] != float64(500) {
 		t.Fatalf("unexpected statuses %#v", statuses)
+	}
+}
+
+func TestAskReturnsServiceUnavailableWhenInflightLimitReached(t *testing.T) {
+	t.Parallel()
+	asker := &blockingAsker{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	srv := NewWithLimits(asker, "", discardLogger(), Limits{
+		MaxInflightRequests: 1,
+		MaxRequestBodyBytes: 1024,
+	})
+	handler := srv.Handler()
+
+	firstDone := make(chan struct{})
+	go func() {
+		defer close(firstDone)
+		req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"first"}`))
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+	}()
+
+	select {
+	case <-asker.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first request did not start")
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"second"}`))
+	rr2 := httptest.NewRecorder()
+	handler.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", rr2.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr2.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["error"] != "server is busy, try again" {
+		t.Fatalf("unexpected error body: %#v", body["error"])
+	}
+
+	close(asker.release)
+	select {
+	case <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first request did not finish")
+	}
+}
+
+func TestAskReturnsPayloadTooLargeWhenBodyExceedsLimit(t *testing.T) {
+	t.Parallel()
+	srv := NewWithLimits(fakeAsker{out: types.AskOutcome{Answer: "ok"}}, "", discardLogger(), Limits{
+		MaxInflightRequests: 2,
+		MaxRequestBodyBytes: 12,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/ask", strings.NewReader(`{"question":"hello"}`))
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d", rr.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["error"] != "request body too large" {
+		t.Fatalf("unexpected error message: %#v", body["error"])
 	}
 }
 

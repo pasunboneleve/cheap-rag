@@ -28,6 +28,20 @@ func Open(path string) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+	// Keep connection behaviour explicit: a small fixed pool avoids
+	// unbounded concurrent SQLite writers while still allowing parallel reads.
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("set sqlite busy timeout: %w", err)
+	}
+	// WAL mode allows readers during writes, which improves behaviour when
+	// indexing and serving overlap.
+	if _, err := db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("set sqlite WAL mode: %w", err)
+	}
 	s := &SQLiteStore{db: db}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dmvianna/cheap-rag/internal/llm"
+	"github.com/dmvianna/cheap-rag/internal/netretry"
 	"github.com/dmvianna/cheap-rag/internal/providerdiag"
 )
 
@@ -105,29 +106,42 @@ func (c *Client) postJSON(ctx context.Context, url string, body any, out any) er
 	if err != nil {
 		return fmt.Errorf("marshal body: %w", err)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+	for attempt := 0; attempt < netretry.MaxAttempts(); attempt++ {
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+		if err != nil {
+			return fmt.Errorf("build request: %w", err)
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+		httpReq.Header.Set("Content-Type", "application/json")
+		res, err := c.httpClient.Do(httpReq)
+		if err != nil {
+			if attempt == 0 && netretry.ShouldRetryTransport(err) && ctx.Err() == nil {
+				if sleepErr := netretry.SleepWithContext(ctx, netretry.Backoff(attempt, nil)); sleepErr == nil {
+					continue
+				}
+			}
+			return fmt.Errorf("http request: %w", err)
+		}
+		providerdiag.RecordStatus(ctx, res.StatusCode)
+		b, readErr := io.ReadAll(io.LimitReader(res.Body, 2<<20))
+		_ = res.Body.Close()
+		if readErr != nil {
+			return fmt.Errorf("read response: %w", readErr)
+		}
+		if res.StatusCode >= 300 {
+			if attempt == 0 && netretry.ShouldRetryStatus(res.StatusCode) && ctx.Err() == nil {
+				if sleepErr := netretry.SleepWithContext(ctx, netretry.Backoff(attempt, nil)); sleepErr == nil {
+					continue
+				}
+			}
+			return fmt.Errorf("api status %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
+		}
+		if err := json.Unmarshal(b, out); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
+		return nil
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-	httpReq.Header.Set("Content-Type", "application/json")
-	res, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("http request: %w", err)
-	}
-	defer res.Body.Close()
-	providerdiag.RecordStatus(ctx, res.StatusCode)
-	b, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-	if res.StatusCode >= 300 {
-		return fmt.Errorf("api status %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
-	}
-	if err := json.Unmarshal(b, out); err != nil {
-		return fmt.Errorf("decode response: %w", err)
-	}
-	return nil
+	return errors.New("request failed after retry")
 }
 
 func buildPrompt(req llm.GenerationRequest) string {

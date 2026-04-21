@@ -2,6 +2,9 @@ content_root: ./content
 runtime_root: ./.chatbot
 runtime:
   socket_path: ./.chatbot/cheap-rag.sock
+server:
+  max_inflight_requests: 16
+  max_request_body_bytes: 16384
 internal_token: ""
 generation_provider: gemini
 embedding_provider: gemini
