@@ -310,8 +310,14 @@ func TestAskReturnsPayloadTooLargeWhenBodyExceedsLimit(t *testing.T) {
 
 func TestListenUnixSocketCleansUp(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	socketPath := filepath.Join(dir, "cheap-rag.sock")
+	// Darwin has a tight sockaddr_un path limit. Use a short path to keep this
+	// test portable across Linux and macOS runners.
+	dir, err := os.MkdirTemp("", "crs")
+	if err != nil {
+		t.Fatalf("mkdir temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	socketPath := filepath.Join(dir, "s.sock")
 	ln, cleanup, err := ListenUnixSocket(socketPath)
 	if err != nil {
 		t.Fatalf("listen socket: %v", err)

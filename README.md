@@ -1,4 +1,6 @@
 # cheap-rag
+[![Linux CI](https://github.com/pasunboneleve/cheap-rag/actions/workflows/linux-ci.yml/badge.svg)](https://github.com/pasunboneleve/cheap-rag/actions/workflows/linux-ci.yml)
+[![macOS CI](https://github.com/pasunboneleve/cheap-rag/actions/workflows/macos-ci.yml/badge.svg)](https://github.com/pasunboneleve/cheap-rag/actions/workflows/macos-ci.yml)
 
 **cheap-rag** is a deliberately simple, low-cost RAG implementation. It
 answers only when local content is sufficiently similar to the
