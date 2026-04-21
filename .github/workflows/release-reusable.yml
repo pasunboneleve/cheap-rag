@@ -76,9 +76,13 @@ jobs:
           body_path: release-notes.md
           fail_on_unmatched_files: true
 
-      - name: Publish GitHub release asset without notes
+      - name: Upload release asset without editing release notes
         if: ${{ !inputs.publish_release_notes }}
-        uses: softprops/action-gh-release@v3
-        with:
-          files: ${{ inputs.archive_name }}
-          fail_on_unmatched_files: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${GITHUB_REF_NAME}" "${{ inputs.archive_name }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
