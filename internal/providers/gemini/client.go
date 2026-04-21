@@ -160,6 +160,7 @@ func (c *Client) postJSON(ctx context.Context, endpoint string, body any, out an
 	if err != nil {
 		return fmt.Errorf("marshal body: %w", err)
 	}
+	var lastErr error
 	for attempt := 0; attempt < netretry.MaxAttempts(); attempt++ {
 		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 		if err != nil {
@@ -173,7 +174,8 @@ func (c *Client) postJSON(ctx context.Context, endpoint string, body any, out an
 					continue
 				}
 			}
-			return fmt.Errorf("http request: %w", err)
+			lastErr = fmt.Errorf("http request: %w", err)
+			break
 		}
 		providerdiag.RecordStatus(ctx, res.StatusCode)
 		b, readErr := io.ReadAll(io.LimitReader(res.Body, 2<<20))
@@ -187,12 +189,16 @@ func (c *Client) postJSON(ctx context.Context, endpoint string, body any, out an
 					continue
 				}
 			}
-			return fmt.Errorf("api status %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
+			lastErr = fmt.Errorf("api status %d: %s", res.StatusCode, strings.TrimSpace(string(b)))
+			break
 		}
 		if err := json.Unmarshal(b, out); err != nil {
 			return fmt.Errorf("decode response: %w", err)
 		}
 		return nil
 	}
-	return errors.New("request failed after retry")
+	if lastErr != nil {
+		return lastErr
+	}
+	return errors.New("request failed")
 }

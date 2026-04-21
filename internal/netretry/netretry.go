@@ -40,10 +40,12 @@ func Backoff(attempt int, rnd *rand.Rand) time.Duration {
 	if attempt < 0 {
 		attempt = 0
 	}
+	var jitterNanos int64
 	if rnd == nil {
-		rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+		jitterNanos = rand.Int63n(retryJitterRangeMax.Nanoseconds() + 1)
+	} else {
+		jitterNanos = rnd.Int63n(retryJitterRangeMax.Nanoseconds() + 1)
 	}
-	jitterNanos := rnd.Int63n(retryJitterRangeMax.Nanoseconds() + 1)
 	return retryBaseBackoff + time.Duration(jitterNanos)
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -24,7 +25,14 @@ type Record struct {
 }
 
 func Open(path string) (*SQLiteStore, error) {
-	db, err := sql.Open("sqlite", path)
+	// Apply concurrency-related PRAGMAs via DSN so every pooled connection
+	// receives the same settings.
+	dsn := fmt.Sprintf("file:%s?_pragma=%s&_pragma=%s",
+		path,
+		url.QueryEscape("busy_timeout(5000)"),
+		url.QueryEscape("journal_mode(WAL)"),
+	)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
@@ -32,16 +40,6 @@ func Open(path string) (*SQLiteStore, error) {
 	// unbounded concurrent SQLite writers while still allowing parallel reads.
 	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(4)
-	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set sqlite busy timeout: %w", err)
-	}
-	// WAL mode allows readers during writes, which improves behaviour when
-	// indexing and serving overlap.
-	if _, err := db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set sqlite WAL mode: %w", err)
-	}
 	s := &SQLiteStore{db: db}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
