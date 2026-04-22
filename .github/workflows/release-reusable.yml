@@ -46,11 +46,12 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          # Allow enough time for create-release job queue/runner latency.
           for i in $(seq 1 30); do
             if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
               exit 0
             fi
-            sleep 2
+            sleep 10
           done
           echo "release object not found for ${tag} after waiting" >&2
           exit 1
