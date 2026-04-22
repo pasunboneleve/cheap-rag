@@ -17,4 +17,3 @@ jobs:
       goarch: amd64
       binary_name: cheaprag
       archive_name: cheaprag-linux-amd64.tar.gz
-      publish_release_notes: true

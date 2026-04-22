@@ -17,4 +17,3 @@ jobs:
       goarch: arm64
       binary_name: cheaprag
       archive_name: cheaprag-darwin-arm64.tar.gz
-      publish_release_notes: false
