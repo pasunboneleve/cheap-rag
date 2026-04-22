@@ -4,6 +4,20 @@ All notable changes to `cheap-rag` will be recorded in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-22
+
+### Added
+- Added `cheaprag version` and `cheaprag --version` command paths.
+
+### Changed
+- Release builds now embed tag version into the binary version output.
+- Local version output now defaults to a semver-shaped dev version (`0.0.0-dev`)
+  with optional VCS metadata suffix when available.
+
+### Fixed
+- Preserved injected release version exactly (without appending VCS metadata).
+- Made `hooks/post-rewrite` portable by removing user-specific binary path.
+
 ## [0.2.1] - 2026-04-21
 
 ### Fixed
