@@ -636,6 +636,10 @@ func resolvedVersion() string {
 	if v == "" {
 		v = "0.0.0-dev"
 	}
+	// Release builds inject a stable semver/tag via ldflags. Preserve it exactly.
+	if v != "0.0.0-dev" {
+		return v
+	}
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return v
