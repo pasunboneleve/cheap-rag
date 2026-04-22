@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -35,7 +36,7 @@ const cliName = "cheaprag"
 var (
 	cliStdout io.Writer = os.Stdout
 	cliStderr io.Writer = os.Stderr
-	version   string    = "dev"
+	version   string    = "0.0.0-dev"
 )
 
 func main() {
@@ -521,7 +522,7 @@ Usage:
   %s --version
 
 Notes:
-  - Local builds default to version "dev".
+  - Local builds default to a dev version (for example 0.0.0-dev+<commit>).
   - Release builds embed the tag version (for example "0.2.1").
 `, cliName, cliName, cliName)
 }
@@ -627,5 +628,41 @@ Examples:
 }
 
 func printVersion(w io.Writer) {
-	fmt.Fprintln(w, strings.TrimSpace(version))
+	fmt.Fprintln(w, resolvedVersion())
+}
+
+func resolvedVersion() string {
+	v := strings.TrimSpace(version)
+	if v == "" {
+		v = "0.0.0-dev"
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return v
+	}
+	if info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	revision := ""
+	modified := ""
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			revision = s.Value
+		case "vcs.modified":
+			modified = s.Value
+		}
+	}
+	if revision == "" {
+		return v
+	}
+	short := revision
+	if len(short) > 12 {
+		short = short[:12]
+	}
+	out := fmt.Sprintf("%s+%s", v, short)
+	if modified == "true" {
+		out += ".dirty"
+	}
+	return out
 }
