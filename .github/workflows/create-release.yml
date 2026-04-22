@@ -48,6 +48,7 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --title "$tag" \
               --notes-file release-notes.md
+          fi
 
   linux-release:
     needs: create-release
