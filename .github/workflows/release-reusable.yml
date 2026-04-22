@@ -39,23 +39,6 @@ jobs:
             exit 1
           fi
 
-      - name: Wait for release object
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          # Allow enough time for create-release job queue/runner latency.
-          for i in $(seq 1 30); do
-            if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "release object not found for ${tag} after waiting" >&2
-          exit 1
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:

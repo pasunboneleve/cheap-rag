@@ -1,4 +1,4 @@
-name: Create release
+name: Release
 
 on:
   push:
@@ -48,4 +48,23 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --title "$tag" \
               --notes-file release-notes.md
-          fi
+
+  linux-release:
+    needs: create-release
+    uses: ./.github/workflows/release-reusable.yml
+    with:
+      runner: ubuntu-latest
+      goos: linux
+      goarch: amd64
+      binary_name: cheaprag
+      archive_name: cheaprag-linux-amd64.tar.gz
+
+  macos-release:
+    needs: create-release
+    uses: ./.github/workflows/release-reusable.yml
+    with:
+      runner: macos-14
+      goos: darwin
+      goarch: arm64
+      binary_name: cheaprag
+      archive_name: cheaprag-darwin-arm64.tar.gz
