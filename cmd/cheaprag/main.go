@@ -35,6 +35,7 @@ const cliName = "cheaprag"
 var (
 	cliStdout io.Writer = os.Stdout
 	cliStderr io.Writer = os.Stderr
+	version   string    = "dev"
 )
 
 func main() {
@@ -45,6 +46,10 @@ func main() {
 }
 
 func run(ctx context.Context, args []string) error {
+	if len(args) == 1 && (args[0] == "--version" || args[0] == "-v") {
+		printVersion(cliStdout)
+		return nil
+	}
 	if len(args) == 0 || isHelpToken(args[0]) {
 		printTopHelp(cliStdout)
 		return nil
@@ -58,6 +63,8 @@ func run(ctx context.Context, args []string) error {
 		return runIndex(ctx, args[1:])
 	case "ask":
 		return runAsk(ctx, args[1:])
+	case "version":
+		return runVersion(args[1:])
 	case "shell":
 		return runShell(ctx, args[1:])
 	case "serve":
@@ -82,6 +89,9 @@ func runHelp(args []string) error {
 		case "ask":
 			printAskHelp(cliStdout)
 			return nil
+		case "version":
+			printVersionHelp(cliStdout)
+			return nil
 		case "shell":
 			printShellHelp(cliStdout)
 			return nil
@@ -98,6 +108,18 @@ func runHelp(args []string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown help topic %q (run '%s --help')", strings.Join(args, " "), cliName)
+}
+
+func runVersion(args []string) error {
+	if wantsHelp(args) {
+		printVersionHelp(cliStdout)
+		return nil
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("version takes no positional arguments (run '%s version --help')", cliName)
+	}
+	printVersion(cliStdout)
+	return nil
 }
 
 func runIndex(ctx context.Context, args []string) error {
@@ -396,6 +418,7 @@ Usage:
 Commands:
   index          index local content into runtime storage
   ask            ask one question and print answer or refusal
+  version        print cheaprag version
   shell          start interactive question loop
   serve          run HTTP API over Unix socket
   inspect query  show retrieval matches and similarity scores
@@ -422,9 +445,10 @@ Examples:
   %s index --config ./cheaprag.example.yaml
   %s shell --config ./cheaprag.example.yaml
   %s ask --config ./cheaprag.example.yaml "what is cheap to change?"
+  %s version
   %s inspect query --config ./cheaprag.example.yaml "ci cd"
   %s serve --config ./cheaprag.example.yaml
-`, cliName, cliName, cliName, cliName, cliName, cliName, cliName, cliName)
+`, cliName, cliName, cliName, cliName, cliName, cliName, cliName, cliName, cliName)
 }
 
 func printIndexHelp(w io.Writer) {
@@ -486,6 +510,20 @@ Examples:
   %s ask --config ./cheaprag.example.yaml "what is cheap to change?"
   %s ask --config ./cheaprag.example.yaml "how do I reduce coupling?"
 `, cliName, cliName, cliName, cliName)
+}
+
+func printVersionHelp(w io.Writer) {
+	fmt.Fprintf(w, `%s
+Print cheaprag version.
+
+Usage:
+  %s version
+  %s --version
+
+Notes:
+  - Local builds default to version "dev".
+  - Release builds embed the tag version (for example "0.2.1").
+`, cliName, cliName, cliName)
 }
 
 func printShellHelp(w io.Writer) {
@@ -586,4 +624,8 @@ Examples:
   %s inspect query --config ./cheaprag.example.yaml "ci cd"
   %s inspect query --runtime ./.cheaprag "cheap to change"
 `, cliName, cliName, cliName, cliName)
+}
+
+func printVersion(w io.Writer) {
+	fmt.Fprintln(w, strings.TrimSpace(version))
 }

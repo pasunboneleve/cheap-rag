@@ -73,3 +73,31 @@ func TestInspectQueryHelpOutput(t *testing.T) {
 		t.Fatalf("expected inspect query usage with cheaprag name, got: %s", out)
 	}
 }
+
+func TestVersionCommandOutput(t *testing.T) {
+	oldVersion := version
+	version = "1.2.3-test"
+	t.Cleanup(func() { version = oldVersion })
+
+	out, _, err := runWithCapture(t, "version")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if strings.TrimSpace(out) != "1.2.3-test" {
+		t.Fatalf("expected version output, got %q", out)
+	}
+}
+
+func TestVersionFlagOutput(t *testing.T) {
+	oldVersion := version
+	version = "9.9.9-test"
+	t.Cleanup(func() { version = oldVersion })
+
+	out, _, err := runWithCapture(t, "--version")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if strings.TrimSpace(out) != "9.9.9-test" {
+		t.Fatalf("expected version output, got %q", out)
+	}
+}

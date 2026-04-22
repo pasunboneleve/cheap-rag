@@ -37,6 +37,7 @@ go run ./cmd/cheaprag shell --config ./cheaprag.example.yaml
 go run ./cmd/cheaprag serve --config ./cheaprag.example.yaml
 go run ./cmd/cheaprag ask --config ./cheaprag.example.yaml "what is cheap to change?"
 go run ./cmd/cheaprag inspect query --config ./cheaprag.example.yaml "ci cd"
+go run ./cmd/cheaprag version
 ```
 
 ## API example
